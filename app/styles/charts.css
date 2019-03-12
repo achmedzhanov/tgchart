@@ -1,3 +1,9 @@
 .chart-box {
 
 }
+
+.chart-slider {
+    height: 20px;
+    width: 100%;
+    position: relative;
+}
