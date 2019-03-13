@@ -1,5 +1,14 @@
 (function (g) {
-    class SVGElement {
+
+    const U = {
+        keyBy: (a, f) => a.reduce((prev,el) => {
+            const [p, v] = f(el);
+            prev[p] = v;
+            return prev;
+        }, {})
+    }
+
+    class ElementBuilder {
         constructor(el) {
             this._el = el;
         }
@@ -31,33 +40,63 @@
 
     function createChart(options) {
         const {el, chartData} = options;
-        const {colors, columns, names, types} = chartData;
+        const {colors, columns, /*names,*/ types} = chartData;
+        const chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
+        const xColumnId = Object.keys(types).find(t => types[t] === 'x');
         const columnsMap = {};
         for(let c of columns) {
             columnsMap[c[0]] = c;
         }
         
-        const createSVG = (type) => new SVGElement(document.createElementNS('http://www.w3.org/2000/svg', type));
+        let state = {
+            disabled: U.keyBy(chartColumnsIds, (id) => [id, false]),
+            visibleRange: { from: 0, to: 100},
+            aspectRatio: 2/1,
+            elements: {
+                linesElements: {},
+
+            }
+        };
+
+        const createSVG = (type) => new ElementBuilder(document.createElementNS('http://www.w3.org/2000/svg', type));
+        const createEl = (type) => new ElementBuilder(document.createElement(type));
     
-        const getStats = () => {
-            const lines = Object.keys(types).filter(t => types[t] !== 'x').map(t => columnsMap[t]);
-            const xColumn = columnsMap[Object.keys(types).find(t => types[t] === 'x')];
-            const yMax = Math.max(...lines.map(l => Math.max(...l.slice(1))));
-            const yMin = Math.min(...lines.map(l => Math.min(...l.slice(1))));
-            const xMin = 0;
-            const xMax = (xColumn.length - 1) * xStep;
-            return {xMin, xMax, yMin, yMax};
+        const getBounds = (s) => {
+            s = s || {
+                disabled: {},
+                visibleRange: { from: 0, to: 100}
+            }
+            
+            const visibleLines = chartColumnsIds.filter(lid => !s.disabled[lid]).map(lid => columnsMap[lid]);
+            const xColumn = columnsMap[xColumnId];
+            // TODO line contains only one point, take into sibling points
+
+            const visibleIndexRange = {
+                from: 1 + (xColumn.length - 1) * s.visibleRange.from / 100,
+                to: (xColumn.length - 1) * s.visibleRange.to / 100
+            };
+            
+            const yMax = Math.max(...visibleLines.map(l => Math.max(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
+            const yMin = Math.min(...visibleLines.map(l => Math.min(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
+            
+            const xSize = (xColumn.length - 1) * xStep;
+            const xMin = xSize * s.visibleRange.from / 100;
+            const xMax = xSize * s.visibleRange.to / 100;
+
+
+            return [xMin, xMax, yMin, yMax];
         };
 
         const init = () => {
             
-            const {xMin, xMax, yMin, yMax} = getStats();
+            const fullBounds = getBounds(null);
+            state.fullBounds = fullBounds;
+            const [xMin, xMax, yMin, yMax] = fullBounds;
 
             const width = xMax - xMin, height = yMax - yMin;
             const aspectRatio = 2/1;
                 
             let yScale = 1 / (height / width) / aspectRatio;
-
             
             const viewBoxPadding = 50;
             const viewBox = [xMin * xCoef - viewBoxPadding,  yMin * yScale -viewBoxPadding,  
@@ -67,13 +106,10 @@
             .style('width', '100%')
             .style('height', '100%')
             .attr('viewBox', `${viewBox[0]} ${viewBox[1]} ${viewBox[2]} ${viewBox[3]}`)
-            //.style('vector-effect', 'non-scaling-stroke')
-            .attr('zoom', 1); // todo set width, height, viewbox etc
+            .attr('zoom', 1);
             
             // TODO chekc view port when xmin really more  0
-
             // TODO use clip?
-
             // TODO need to scle coordinates to minimive viewposrt of svg?
 
             const initalTransform = `matrix(1, 0, 0, ${yScale}, 0, 0)`;
@@ -81,29 +117,29 @@
             const lc = 5;
             const lineGEl =  createSVG('g')
             .style('stroke-width', '1px')
-                    .style('vector-effect', 'non-scaling-stroke')
-                    .style('stroke', 'gray')
-                    .style('fill', 'none')
-                    .style('vector-effect', 'non-scaling-stroke')
-                    .attr('transform', initalTransform)
-                    .appendTo(svgEl);
+            .style('vector-effect', 'non-scaling-stroke')
+            .style('stroke', 'gray')
+            .style('fill', 'none')
+            .style('vector-effect', 'non-scaling-stroke')
+            .attr('transform', initalTransform)
+            .appendTo(svgEl);
+            
             for(let i = 0;i<=lc;i++) {
-                    let y = yMin + (yMax - yMin) / lc * i;
-                    createSVG('path')
-                    .attr('d',  'M0 ' + y + ' L' + xMax +' ' + y)
-                    .appendTo(lineGEl);    
-                }    
+                let y = yMin + (yMax - yMin) / lc * i;
+                createSVG('path')
+                .attr('d',  'M0 ' + y + ' L' + xMax +' ' + y)
+                .appendTo(lineGEl);    
+            }    
 
-            const columnNames = Object.keys(types);
+            const columnIds = Object.keys(types);
 
             // ==>> TODO !!!! invert coordinates !!!!
 
             const lineElements = {};
 
-            for (let columnIndex = 0; columnIndex< columnNames.length; columnIndex++) {
-                const columnName = columnNames[columnIndex], 
+            for (let columnIndex = 0; columnIndex< columnIds.length; columnIndex++) {
+                const columnName = columnIds[columnIndex], 
                     t = types[columnName],
-                    n = names[columnName],
                     color = colors[columnName],
                     c = columnsMap[columnName];
                 
@@ -116,51 +152,70 @@
                         d += c[pIdx] * yCoef;
                     }
                     const p =createSVG('path')
-                        .attr('d', d)
-                        .style('stroke', color)
-                        .style('stroke-width', '2px')
-                        // vector-effect: non-scaling-stroke
-                        .style('vector-effect', 'non-scaling-stroke')
-                        .attr('transform', initalTransform)
-                        .style('fill', 'none')
-                        .appendTo(svgEl);
+                    .attr('d', d)
+                    .style('stroke', color)
+                    .style('stroke-width', '2px')
+                    // vector-effect: non-scaling-stroke
+                    .style('vector-effect', 'non-scaling-stroke')
+                    .attr('transform', initalTransform)
+                    .style('fill', 'none')
+                    .appendTo(svgEl);
+                    
                     lineElements[columnName] = p.el; 
                 } else if (t === 'x') {
                     // todo create x axis
                 }
             }
 
+            state.elements.linesElements = lineElements;
+
             svgEl.appendTo(el);
 
             //const sliderEl = document.createElement('div');
             //sliderEl.classList.add('chart-slider');
 
-            const sliderEl = document.createElement('input');
-            sliderEl.setAttribute('type', 'range');
-            sliderEl.setAttribute('min', '0');
-            sliderEl.setAttribute('max', '100');
-            sliderEl.setAttribute('step', '0.1');
-            sliderEl.setAttribute('value', '100');
-            sliderEl.style['width'] = '100%';
+            const sliderEl = createEl('input')
+            .attr('type', 'range')
+            .attr('min', '0')
+            .attr('max', '100')
+            .attr('step', '0.1')
+            .attr('value', '100')
+            .style('width', '100%').el;
+            
             const onSliderChange = (e) => {
                 const val = Math.max(e.target.value, 3);
-                console.log('range-val', val, performance.now());
-                const t = `matrix(${100/val},0,0,${yScale},0,0)`;
-                for(let l of Object.values(lineElements)) {
-                    l.setAttribute('transform', t);
-                }
+                // 0 <= val <= 100
+                setRange({from: 0, to: val});
             };
             sliderEl.onchange = onSliderChange;
             sliderEl.oninput = onSliderChange;
 
             el.appendChild(sliderEl);
-
-            /* <input id="vol-control" type="range" min="0" max="100" step="1" oninput="SetVolume(this.value)" onchange="SetVolume(this.value)"></input>  */            
-    
-
-
         }
     
+        const setRange = (range) => {
+            
+            range = range || {from: 0, to: 100};
+            state.visibleRange = range;
+            
+            const W = state.fullBounds[1] - state.fullBounds[0];
+
+            const [xMin, xMax, yMin, yMax] = getBounds(state);
+
+
+            const w = xMax - xMin, h = yMax - yMin;
+            const aspectRatio = 2/1;
+                 
+            const xScale = W/w;
+            const yScale = 1 / (h / W) / aspectRatio;
+            const dx = -xMin, dy = -yMin;
+
+            const t = `matrix(1,0,0,1,${dx},${dy}) matrix(${xScale},0,0,${yScale},0,0)`;
+            for(let l of Object.values(state.elements.linesElements)) {
+                l.setAttribute('transform', t);
+            }
+        }
+
         init();
     }
     
