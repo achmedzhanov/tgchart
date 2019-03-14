@@ -10,5 +10,6 @@
 
 .animate-transform {
     /*animation: 1s;*/
-    transition: transform 0.15s ease-out;
+    /*transition: transform 0.15s ease-out;*/
+    transition: transform 0.15s linear;
 }
