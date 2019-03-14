@@ -22,6 +22,11 @@
             this._el.style[name] = value;
             return this;
         }
+
+        addClass(c) {
+            this._el.classList.add(c);
+            return this;
+        }
     
         appendTo(parent) {
             if(parent.el) 
@@ -113,10 +118,11 @@
             // TODO need to scle coordinates to minimive viewposrt of svg?
 
             const initalTransform = `matrix(1, 0, 0, ${yScale}, 0, 0)`;
+            //const initalTransform = `matrix(1, 0, 0, 1, 0, 0)`;
 
             const lc = 5;
-            const lineGEl =  createSVG('g')
-            .style('stroke-width', '1px')
+            const hGridLines =  createSVG('g')
+            .addClass('animate-transform')
             .style('vector-effect', 'non-scaling-stroke')
             .style('stroke', 'gray')
             .style('fill', 'none')
@@ -127,15 +133,26 @@
             for(let i = 0;i<=lc;i++) {
                 let y = yMin + (yMax - yMin) / lc * i;
                 createSVG('path')
+                .style('stroke-width', '1px')
+                .style('vector-effect', 'non-scaling-stroke')
                 .attr('d',  'M0 ' + y + ' L' + xMax +' ' + y)
-                .appendTo(lineGEl);    
+                .appendTo(hGridLines);    
             }    
+
+            state.elements.hGridLines = hGridLines;
 
             const columnIds = Object.keys(types);
 
             // ==>> TODO !!!! invert coordinates !!!!
 
             const lineElements = {};
+            const linesGC = createSVG('g')
+            .addClass('animate-transform')
+            //.attr('transform', initalTransform)
+            .appendTo(svgEl);
+            const linesG = createSVG('g')
+            .attr('transform', initalTransform)
+            .appendTo(linesGC);
 
             for (let columnIndex = 0; columnIndex< columnIds.length; columnIndex++) {
                 const columnName = columnIds[columnIndex], 
@@ -155,11 +172,9 @@
                     .attr('d', d)
                     .style('stroke', color)
                     .style('stroke-width', '2px')
-                    // vector-effect: non-scaling-stroke
                     .style('vector-effect', 'non-scaling-stroke')
-                    .attr('transform', initalTransform)
                     .style('fill', 'none')
-                    .appendTo(svgEl);
+                    .appendTo(linesG);
                     
                     lineElements[columnName] = p.el; 
                 } else if (t === 'x') {
@@ -168,6 +183,8 @@
             }
 
             state.elements.linesElements = lineElements;
+            state.elements.linesGC = linesGC;
+            state.elements.linesG = linesG;
 
             svgEl.appendTo(el);
 
@@ -210,10 +227,16 @@
             const yScale = 1 / (h / W) / aspectRatio;
             const dx = -xMin, dy = -yMin;
 
-            const t = `matrix(1,0,0,1,${dx},${dy}) matrix(${xScale},0,0,${yScale},0,0)`;
-            for(let l of Object.values(state.elements.linesElements)) {
-                l.setAttribute('transform', t);
-            }
+            const verticalTransform = `matrix(1,0,0,1,0,${dy}) matrix(1,0,0,${yScale},0,0)`;
+            const horizontalTransform = `matrix(1,0,0,1,${dx},0) matrix(${xScale},0,0,1,0,0)`;
+            state.elements.linesGC.attr('transform', verticalTransform);
+            state.elements.linesG.attr('transform', horizontalTransform);
+            
+            state.elements.hGridLines.attr('transform', verticalTransform);
+
+            // for(let l of Object.values(state.elements.linesElements)) {
+            //     l.setAttribute('transform', t);
+            // }
         }
 
         init();
