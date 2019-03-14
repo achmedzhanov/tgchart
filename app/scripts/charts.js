@@ -148,10 +148,9 @@
             const lineElements = {};
             const linesGC = createSVG('g')
             .addClass('animate-transform')
-            //.attr('transform', initalTransform)
+            .attr('transform', initalTransform)
             .appendTo(svgEl);
             const linesG = createSVG('g')
-            .attr('transform', initalTransform)
             .appendTo(linesGC);
 
             for (let columnIndex = 0; columnIndex< columnIds.length; columnIndex++) {
