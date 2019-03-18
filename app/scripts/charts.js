@@ -8,6 +8,17 @@
         }, {})
     }
 
+    const mul = (m1, m2) => {
+        return [
+        m1[0] * m2[0] + m1[2] * m2[1],
+        m1[1] * m2[0] + m1[3]* m2[1],
+        m1[0] * m2[2] + m1[2] * m2[3],
+        m1[1] * m2[2] + m1[3] * m2[3],
+        m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
+        m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
+        ];
+    }
+
     class ElementBuilder {
         constructor(el) {
             this._el = el;
@@ -91,7 +102,7 @@
             };
             
             let yMax = Math.max(...visibleLines.map(l => Math.max(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
-            let yMin = Math.min(...visibleLines.map(l => Math.min(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
+            //let yMin = Math.min(...visibleLines.map(l => Math.min(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
             
             const xSize = (xColumn.length - 2) * xStep;
             const xMin = xSize * s.visibleRange.from / 100;
@@ -110,7 +121,7 @@
             
             const fullBounds = getBounds(null);
             state.fullBounds = fullBounds;
-            const [xMin, xMax, yMin, yMax] = fullBounds;
+            const [, xMax, yMin, yMax] = fullBounds;
 
             state.sizes = sizes;
 
@@ -131,7 +142,7 @@
 
             const lc = 5;
             const hGridLines = [];
-            const hGridTexts = [];
+            //const hGridTexts = [];
             const hGridLinesG =  createSVG('g')
             .addClass('animate-transform')
             .style('vector-effect', 'non-scaling-stroke')
@@ -242,20 +253,20 @@
 
             state.visibleRange = range;
             
-            const W = state.fullBounds[1] - state.fullBounds[0], H = state.fullBounds[3] - state.fullBounds[2], fbyMax = state.fullBounds[3];
+            const fbyMax = state.fullBounds[3];
 
             const newBounds = getBounds(state);
             const [xMin, xMax, yMin, yMax] = newBounds;
 
-            const w = xMax - xMin, h = yMax - yMin;
-            const aspectRatio = 2/1;
-
             let xScale = state.sizes.width / xMax;
             let yScale = state.sizes.height / yMax;
 
-            const dx = -xMin, dy = 0 /*-yMin*/;
+            const dx = -xMin /*, dy = 0 /*-yMin*/;
 
-            const verticalTransform = `matrix(1,0,0,1,0,${yMax * yScale}) matrix(1,0,0,${yScale},0,0) matrix(1,0,0,1,0,${-fbyMax})`;
+            const m1 = [1,0,0,1,0, yMax * yScale], m2 = [1,0,0, yScale,0,0], m3 =[1,0,0,1,0,-fbyMax];
+            const vt = mul(m1, mul(m2, m3));
+            const verticalTransform = `matrix(${vt[0]},${vt[1]},${vt[2]},${vt[3]},${vt[4]},${vt[5]})`;
+
             const horizontalTransform = `matrix(1,0,0,1,${dx},0) matrix(${xScale},0,0,1,0,0)`;
             state.elements.linesGC.attr('transform', verticalTransform);
             state.elements.linesG.attr('transform', horizontalTransform);
@@ -265,15 +276,16 @@
             if(prevBounds[2] !== yMin || prevBounds[3] !== yMax) {
                 // update y axis lines
                 //state.elements.hGridLinesG.attr('transform', 'none');
-                const linesCount = state.elements.hGridLines.length;
-                let prevYScale = state.sizes.height / prevBounds[3]
                 const lc = 5;
 
                 const newLines = calcYAxis(yScale, prevBounds, lc);
-                console.log('newLines', newLines);
+                // console.log('newLines', newLines);
+                
+                // TODO_create_elemts_pool!
+
                 const gridElements = createYGridLines(newLines, (el) => el.style('opacity', '0.1'));
                 const movedLines = calcYAxis(yScale, newBounds, lc);
-                console.log('movedLines', movedLines);
+                // console.log('movedLines', movedLines);
                 setTimeout(() => {
                 updateYGridLines(gridElements, movedLines, (el) => el.style('opacity', '1'));
                 }, 0);
@@ -281,7 +293,7 @@
         }
 
         const calcYAxis = (yScale, bounds, lc) => {
-            const [xMin, xMax, yMin, yMax] = bounds;
+            const [, , yMin, yMax] = bounds;
             const lines = [];
 
             for(let i = 0;i<=lc;i++) {
