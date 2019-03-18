@@ -275,16 +275,18 @@
                         
             const oldVerticalTransform = vertMatrix(prevBounds);
             const verticalTransform = vertMatrix(newBounds);
-            state.elements.linesGC.el.animate([{
-                transform: oldVerticalTransform
-            }, {
-                transform: verticalTransform
-            }], {
-                duration: 350,
-                easing: 'linear',
-                direction: 'normal',
-                fill: 'both'
-            });
+            if(oldVerticalTransform !== verticalTransform) {
+                state.elements.linesGC.el.animate([{
+                    transform: oldVerticalTransform
+                }, {
+                    transform: verticalTransform
+                }], {
+                    duration: 150,
+                    easing: 'linear',
+                    direction: 'normal',
+                    fill: 'both'
+                });
+            }
 
             const horizontalTransform = `matrix(1,0,0,1,${dx},0) matrix(${xScale},0,0,1,0,0)`;
             //state.elements.linesGC.attr('transform', verticalTransform);
