@@ -41,7 +41,8 @@
         }
     }
 
-    const xCoef = 1, yCoef = 1, xStep = 20;
+    const xCoef = 1, xStep = 20;
+    let translateY = (y) => y;
 
     function createChart(options) {
         const {el, chartData} = options;
@@ -67,6 +68,7 @@
         const createEl = (type) => new ElementBuilder(document.createElement(type));
     
         const getBounds = (s) => {
+            // const ty = !!s;
             s = s || {
                 disabled: {},
                 visibleRange: { from: 0, to: 100}
@@ -81,15 +83,20 @@
                 to: (xColumn.length - 1) * s.visibleRange.to / 100
             };
             
-            const yMax = Math.max(...visibleLines.map(l => Math.max(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
-            const yMin = Math.min(...visibleLines.map(l => Math.min(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
+            let yMax = Math.max(...visibleLines.map(l => Math.max(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
+            let yMin = Math.min(...visibleLines.map(l => Math.min(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
             
-            const xSize = (xColumn.length - 1) * xStep;
+            const xSize = (xColumn.length - 2) * xStep;
             const xMin = xSize * s.visibleRange.from / 100;
             const xMax = xSize * s.visibleRange.to / 100;
 
+            // if(ty) {
+            //     const yMaxOld = yMax;
+            //     yMax = translateY(yMin);
+            //     yMin = translateY(yMaxOld);
+            // }
 
-            return [xMin, xMax, yMin, yMax];
+            return [xMin, xMax, 0 /*yMin*/, yMax];
         };
 
         const init = () => {
@@ -103,9 +110,13 @@
                 
             let yScale = 1 / (height / width) / aspectRatio;
             
-            const viewBoxPadding = 50;
+            //const viewBoxPadding = 0;
+            const viewBoxPadding = 0.05 * Math.min((xMax - xMin) * xCoef, (yMax - yMin) * yScale );
             const viewBox = [xMin * xCoef - viewBoxPadding,  yMin * yScale -viewBoxPadding,  
-                xMax * xCoef + viewBoxPadding, yMax * yScale + viewBoxPadding];
+                (xMax - xMin) * xCoef + 2 * viewBoxPadding, (yMax - yMin) * yScale + 2 * viewBoxPadding];
+            
+            
+            translateY = (y) => -(y - yMin) + yMax /* -yMin  */;    
                 
             const svgEl = createSVG('svg')
             .style('width', '100%')
@@ -118,9 +129,10 @@
             // TODO need to scle coordinates to minimive viewposrt of svg?
 
             const initalTransform = `matrix(1, 0, 0, ${yScale}, 0, 0)`;
+
             //const initalTransform = `matrix(1, 0, 0, 1, 0, 0)`;
 
-            const lc = 5;
+            const lc = 10;
             const hGridLines =  createSVG('g')
             .addClass('animate-transform')
             .style('vector-effect', 'non-scaling-stroke')
@@ -165,7 +177,7 @@
                         d += (pIdx == 1 ? 'M' : 'L');
                         d += (pIdx - 1) * xStep * xCoef;
                         d += ' ';
-                        d += c[pIdx] * yCoef;
+                        d += translateY(c[pIdx]);
                     }
                     const p =createSVG('path')
                     .attr('d', d)
@@ -214,7 +226,7 @@
             range = range || {from: 0, to: 100};
             state.visibleRange = range;
             
-            const W = state.fullBounds[1] - state.fullBounds[0];
+            const W = state.fullBounds[1] - state.fullBounds[0], H = state.fullBounds[3] - state.fullBounds[2], fbyMax = state.fullBounds[3];
 
             const [xMin, xMax, yMin, yMax] = getBounds(state);
 
@@ -224,9 +236,16 @@
                  
             const xScale = W/w;
             const yScale = 1 / (h / W) / aspectRatio;
-            const dx = -xMin, dy = -yMin;
+            // TODO translate center of chart to (0,0) before scale!
+            const dx = -xMin, dy = 0 /*-yMin*/;
 
-            const verticalTransform = `matrix(1,0,0,1,0,${dy}) matrix(1,0,0,${yScale},0,0)`;
+            const verticalTransform = `matrix(1,0,0,1,0,${yMax * yScale}) matrix(1,0,0,${yScale},0,0) matrix(1,0,0,1,0,${-fbyMax})`;
+            //const verticalTransform = `matrix(1,0,0,1,0,${yMax  - (yScale - 1) * (yMax - yMin)}) matrix(1,0,0,${yScale},0,0) matrix(1,0,0,1,0,${-yMax})`;
+            //const verticalTransform = `matrix(1,0,0,${yScale},0,0)`;
+            console.log('Bounds', xMin, xMax, yMin, yMax);
+            console.log(` ${yScale} = yScale = 1 / (${h} / ${W}) / ${aspectRatio}; ${h/H} = (h/H) = (${h}/${H})`);
+            console.log(`W ${W} w ${w} h ${h} xScale ${xScale} yScale ${yScale}`);
+            console.log(`VT ${verticalTransform}`);
             const horizontalTransform = `matrix(1,0,0,1,${dx},0) matrix(${xScale},0,0,1,0,0)`;
             state.elements.linesGC.attr('transform', verticalTransform);
             state.elements.linesG.attr('transform', horizontalTransform);
