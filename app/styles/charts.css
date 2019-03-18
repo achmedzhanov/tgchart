@@ -9,7 +9,10 @@
 }
 
 .animate-transform {
-    /*animation: 1s;*/
-    /*transition: transform 0.15s ease-out;*/
     transition: transform 0.15s linear;
+}
+
+.animate-transform-opacity {
+    transition: 0.15s linear;
+    transition-property: transform, opacity;
 }

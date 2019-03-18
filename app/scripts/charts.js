@@ -17,6 +17,11 @@
             this._el.setAttribute(name, value);
             return this;
         }
+
+        textContent(value) {
+            this._el.textContent = value;
+            return this;
+        }
     
         style(name, value) {
             this._el.style[name] = value;
@@ -46,6 +51,8 @@
 
     function createChart(options) {
         const {el, chartData} = options;
+        let {sizes} = options;
+        sizes = sizes || {width: 500, height: 250};
         const {colors, columns, /*names,*/ types} = chartData;
         const chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
         const xColumnId = Object.keys(types).find(t => types[t] === 'x');
@@ -105,22 +112,26 @@
             state.fullBounds = fullBounds;
             const [xMin, xMax, yMin, yMax] = fullBounds;
 
-            const width = xMax - xMin, height = yMax - yMin;
-            const aspectRatio = 2/1;
+            state.sizes = sizes;
+
+            const graphWidth = xMax - xMin, graphHeight = yMax - yMin;
+            const aspectRatio = sizes.width/sizes.height;
                 
-            let yScale = 1 / (height / width) / aspectRatio;
+            let xScale = sizes.width / xMax;
+            let yScale = sizes.height / yMax;
             
             //const viewBoxPadding = 0;
             const viewBoxPadding = 0.05 * Math.min((xMax - xMin) * xCoef, (yMax - yMin) * yScale );
-            const viewBox = [xMin * xCoef - viewBoxPadding,  yMin * yScale -viewBoxPadding,  
-                (xMax - xMin) * xCoef + 2 * viewBoxPadding, (yMax - yMin) * yScale + 2 * viewBoxPadding];
+            //const viewBox = [xMin * xCoef - viewBoxPadding,  yMin * yScale -viewBoxPadding,  
+                //(xMax - xMin) * xCoef + 2 * viewBoxPadding, (yMax - yMin) * yScale + 2 * viewBoxPadding];
             
+            const viewBox = [ 0, 0, sizes.width, sizes.height];
             
             translateY = (y) => -(y - yMin) + yMax /* -yMin  */;    
                 
             const svgEl = createSVG('svg')
-            .style('width', '100%')
-            .style('height', '100%')
+            .style('width', sizes.width)
+            .style('height', sizes.height)
             .attr('viewBox', `${viewBox[0]} ${viewBox[1]} ${viewBox[2]} ${viewBox[3]}`)
             .attr('zoom', 1);
             
@@ -128,29 +139,45 @@
             // TODO use clip?
             // TODO need to scle coordinates to minimive viewposrt of svg?
 
-            const initalTransform = `matrix(1, 0, 0, ${yScale}, 0, 0)`;
+            const initalTransform = `matrix(${xScale}, 0, 0, ${yScale}, 0, 0)`;
 
             //const initalTransform = `matrix(1, 0, 0, 1, 0, 0)`;
 
-            const lc = 10;
-            const hGridLines =  createSVG('g')
+            const lc = 5;
+            const hGridLines = [];
+            const hGridTexts = [];
+            const hGridLinesG =  createSVG('g')
             .addClass('animate-transform')
             .style('vector-effect', 'non-scaling-stroke')
-            .style('stroke', 'gray')
-            .style('fill', 'none')
-            .style('vector-effect', 'non-scaling-stroke')
-            .attr('transform', initalTransform)
+            //.attr('transform', initalTransform)
             .appendTo(svgEl);
             
             for(let i = 0;i<=lc;i++) {
-                let y = yMin + (yMax - yMin) / lc * i;
-                createSVG('path')
+                let yGraph = (yMax - yMin) / lc * i;
+                let y = yMin + (yMax - yMin) / lc * i * yScale;
+                const lEl = createSVG('path')
                 .style('stroke-width', '1px')
+                .style('stroke', 'lightblue')
+                .style('fill', 'none')
                 .style('vector-effect', 'non-scaling-stroke')
-                .attr('d',  'M0 ' + y + ' L' + xMax +' ' + y)
-                .appendTo(hGridLines);    
+                .attr('d',  'M0 ' + y + ' L' + (xMax * xScale) +' ' + y)
+                .appendTo(hGridLinesG);
+                hGridLines.push(lEl);
+
+                const tEl = createSVG('text')
+                .attr('x',  '0')
+                .attr('y',  y - 5)
+                // .attr('font-family', ' "Helvetica Neue", Helvetica, Arial, sans-serif')
+                .attr('font-family', 'sans-serif')
+                .attr('font-size', '14')
+                .attr('fill', 'gray')
+                .textContent('' + translateY(yGraph))
+                .appendTo(hGridLinesG);
+                hGridTexts.push(tEl);
+
             }    
 
+            state.elements.hGridLinesG = hGridLinesG;
             state.elements.hGridLines = hGridLines;
 
             const columnIds = Object.keys(types);
@@ -224,6 +251,10 @@
         const setRange = (range) => {
             
             range = range || {from: 0, to: 100};
+            if(state.visibleRange.from == range.from && state.visibleRange.to == range.to) return;
+            
+            const prevBounds = getBounds(state);
+
             state.visibleRange = range;
             
             const W = state.fullBounds[1] - state.fullBounds[0], H = state.fullBounds[3] - state.fullBounds[2], fbyMax = state.fullBounds[3];
@@ -240,21 +271,24 @@
             const dx = -xMin, dy = 0 /*-yMin*/;
 
             const verticalTransform = `matrix(1,0,0,1,0,${yMax * yScale}) matrix(1,0,0,${yScale},0,0) matrix(1,0,0,1,0,${-fbyMax})`;
-            //const verticalTransform = `matrix(1,0,0,1,0,${yMax  - (yScale - 1) * (yMax - yMin)}) matrix(1,0,0,${yScale},0,0) matrix(1,0,0,1,0,${-yMax})`;
-            //const verticalTransform = `matrix(1,0,0,${yScale},0,0)`;
-            console.log('Bounds', xMin, xMax, yMin, yMax);
-            console.log(` ${yScale} = yScale = 1 / (${h} / ${W}) / ${aspectRatio}; ${h/H} = (h/H) = (${h}/${H})`);
-            console.log(`W ${W} w ${w} h ${h} xScale ${xScale} yScale ${yScale}`);
-            console.log(`VT ${verticalTransform}`);
             const horizontalTransform = `matrix(1,0,0,1,${dx},0) matrix(${xScale},0,0,1,0,0)`;
             state.elements.linesGC.attr('transform', verticalTransform);
             state.elements.linesG.attr('transform', horizontalTransform);
-            
-            state.elements.hGridLines.attr('transform', verticalTransform);
 
-            // for(let l of Object.values(state.elements.linesElements)) {
-            //     l.setAttribute('transform', t);
-            // }
+            state.elements.hGridLinesG.attr('transform', verticalTransform);
+
+            if(prevBounds[2] !== yMin || prevBounds[3] !== yMax) {
+                // update y axis lines
+                //state.elements.hGridLinesG.attr('transform', 'none');
+                const linesCount = state.elements.hGridLines.length;
+                for (let i=0;i<linesCount;i++) {
+                    // .animate-transform-opacity
+
+                }
+                // const lineStep = 
+            }
+
+
         }
 
         init();
