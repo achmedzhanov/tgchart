@@ -182,7 +182,7 @@
 
             const lineElements = {};
             const linesGC = createSVG('g')
-            .addClass('animate-transform')
+            //.addClass('animate-transform')
             .attr('transform', initalTransform)
             .appendTo(svgEl);
             const linesG = createSVG('g')
@@ -244,6 +244,16 @@
             el.appendChild(sliderEl);
         }
     
+        const vertMatrix = (bounds) => {
+            const fbyMax = state.fullBounds[3];
+            const yMax = bounds[3];
+            let yScale = state.sizes.height / yMax;
+            const m1 = [1,0,0,1,0, yMax * yScale], m2 = [1,0,0, yScale,0,0], m3 =[1,0,0,1,0,-fbyMax];
+            const vt = mul(m1, mul(m2, m3));
+            const verticalTransform = 'matrix(' + vt[0] + ',' + vt[1] + ',' + vt[2] + ',' + vt[3] + ',' + vt[4] + ',' + vt[5] + ')';
+            return verticalTransform;
+        }
+
         const setRange = (range) => {
             
             range = range || {from: 0, to: 100};
@@ -262,13 +272,22 @@
             let yScale = state.sizes.height / yMax;
 
             const dx = -xMin /*, dy = 0 /*-yMin*/;
-
-            const m1 = [1,0,0,1,0, yMax * yScale], m2 = [1,0,0, yScale,0,0], m3 =[1,0,0,1,0,-fbyMax];
-            const vt = mul(m1, mul(m2, m3));
-            const verticalTransform = `matrix(${vt[0]},${vt[1]},${vt[2]},${vt[3]},${vt[4]},${vt[5]})`;
+                        
+            const oldVerticalTransform = vertMatrix(prevBounds);
+            const verticalTransform = vertMatrix(newBounds);
+            state.elements.linesGC.el.animate([{
+                transform: oldVerticalTransform
+            }, {
+                transform: verticalTransform
+            }], {
+                duration: 350,
+                easing: 'linear',
+                direction: 'normal',
+                fill: 'both'
+            });
 
             const horizontalTransform = `matrix(1,0,0,1,${dx},0) matrix(${xScale},0,0,1,0,0)`;
-            state.elements.linesGC.attr('transform', verticalTransform);
+            //state.elements.linesGC.attr('transform', verticalTransform);
             state.elements.linesG.attr('transform', horizontalTransform);
 
             //state.elements.hGridLinesG.attr('transform', verticalTransform);
