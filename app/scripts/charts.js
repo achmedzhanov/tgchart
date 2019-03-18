@@ -114,16 +114,8 @@
 
             state.sizes = sizes;
 
-            const graphWidth = xMax - xMin, graphHeight = yMax - yMin;
-            const aspectRatio = sizes.width/sizes.height;
-                
             let xScale = sizes.width / xMax;
             let yScale = sizes.height / yMax;
-            
-            //const viewBoxPadding = 0;
-            const viewBoxPadding = 0.05 * Math.min((xMax - xMin) * xCoef, (yMax - yMin) * yScale );
-            //const viewBox = [xMin * xCoef - viewBoxPadding,  yMin * yScale -viewBoxPadding,  
-                //(xMax - xMin) * xCoef + 2 * viewBoxPadding, (yMax - yMin) * yScale + 2 * viewBoxPadding];
             
             const viewBox = [ 0, 0, sizes.width, sizes.height];
             
@@ -135,13 +127,7 @@
             .attr('viewBox', `${viewBox[0]} ${viewBox[1]} ${viewBox[2]} ${viewBox[3]}`)
             .attr('zoom', 1);
             
-            // TODO chekc view port when xmin really more  0
-            // TODO use clip?
-            // TODO need to scle coordinates to minimive viewposrt of svg?
-
             const initalTransform = `matrix(${xScale}, 0, 0, ${yScale}, 0, 0)`;
-
-            //const initalTransform = `matrix(1, 0, 0, 1, 0, 0)`;
 
             const lc = 5;
             const hGridLines = [];
@@ -149,31 +135,30 @@
             const hGridLinesG =  createSVG('g')
             .addClass('animate-transform')
             .style('vector-effect', 'non-scaling-stroke')
-            //.attr('transform', initalTransform)
             .appendTo(svgEl);
             
             for(let i = 0;i<=lc;i++) {
-                let yGraph = (yMax - yMin) / lc * i;
-                let y = yMin + (yMax - yMin) / lc * i * yScale;
-                const lEl = createSVG('path')
-                .style('stroke-width', '1px')
-                .style('stroke', 'lightblue')
-                .style('fill', 'none')
-                .style('vector-effect', 'non-scaling-stroke')
-                .attr('d',  'M0 ' + y + ' L' + (xMax * xScale) +' ' + y)
-                .appendTo(hGridLinesG);
-                hGridLines.push(lEl);
+                // let yGraph = (yMax - yMin) / lc * i;
+                // let y = yMin + (yMax - yMin) / lc * i * yScale;
+                // const lEl = createSVG('path')
+                // .style('stroke-width', '1px')
+                // .style('stroke', 'lightblue')
+                // .style('fill', 'none')
+                // .style('vector-effect', 'non-scaling-stroke')
+                // .attr('d',  'M0 ' + y + ' L' + (xMax * xScale) +' ' + y)
+                // .appendTo(hGridLinesG);
+                // hGridLines.push(lEl);
 
-                const tEl = createSVG('text')
-                .attr('x',  '0')
-                .attr('y',  y - 5)
-                // .attr('font-family', ' "Helvetica Neue", Helvetica, Arial, sans-serif')
-                .attr('font-family', 'sans-serif')
-                .attr('font-size', '14')
-                .attr('fill', 'gray')
-                .textContent('' + translateY(yGraph))
-                .appendTo(hGridLinesG);
-                hGridTexts.push(tEl);
+                // const tEl = createSVG('text')
+                // .attr('x',  '0')
+                // .attr('y',  y - 5)
+                // // .attr('font-family', ' "Helvetica Neue", Helvetica, Arial, sans-serif')
+                // .attr('font-family', 'sans-serif')
+                // .attr('font-size', '14')
+                // .attr('fill', 'gray')
+                // .textContent('' + translateY(yGraph))
+                // .appendTo(hGridLinesG);
+                // hGridTexts.push(tEl);
 
             }    
 
@@ -259,15 +244,15 @@
             
             const W = state.fullBounds[1] - state.fullBounds[0], H = state.fullBounds[3] - state.fullBounds[2], fbyMax = state.fullBounds[3];
 
-            const [xMin, xMax, yMin, yMax] = getBounds(state);
-
+            const newBounds = getBounds(state);
+            const [xMin, xMax, yMin, yMax] = newBounds;
 
             const w = xMax - xMin, h = yMax - yMin;
             const aspectRatio = 2/1;
-                 
-            const xScale = W/w;
-            const yScale = 1 / (h / W) / aspectRatio;
-            // TODO translate center of chart to (0,0) before scale!
+
+            let xScale = state.sizes.width / xMax;
+            let yScale = state.sizes.height / yMax;
+
             const dx = -xMin, dy = 0 /*-yMin*/;
 
             const verticalTransform = `matrix(1,0,0,1,0,${yMax * yScale}) matrix(1,0,0,${yScale},0,0) matrix(1,0,0,1,0,${-fbyMax})`;
@@ -275,21 +260,91 @@
             state.elements.linesGC.attr('transform', verticalTransform);
             state.elements.linesG.attr('transform', horizontalTransform);
 
-            state.elements.hGridLinesG.attr('transform', verticalTransform);
+            //state.elements.hGridLinesG.attr('transform', verticalTransform);
 
             if(prevBounds[2] !== yMin || prevBounds[3] !== yMax) {
                 // update y axis lines
                 //state.elements.hGridLinesG.attr('transform', 'none');
                 const linesCount = state.elements.hGridLines.length;
-                for (let i=0;i<linesCount;i++) {
-                    // .animate-transform-opacity
+                let prevYScale = state.sizes.height / prevBounds[3]
+                const lc = 5;
 
-                }
-                // const lineStep = 
+                const newLines = calcYAxis(yScale, prevBounds, lc);
+                console.log('newLines', newLines);
+                const gridElements = createYGridLines(newLines, (el) => el.style('opacity', '0.1'));
+                const movedLines = calcYAxis(yScale, newBounds, lc);
+                console.log('movedLines', movedLines);
+                setTimeout(() => {
+                updateYGridLines(gridElements, movedLines, (el) => el.style('opacity', '1'));
+                }, 0);
             }
-
-
         }
+
+        const calcYAxis = (yScale, bounds, lc) => {
+            const [xMin, xMax, yMin, yMax] = bounds;
+            const lines = [];
+
+            for(let i = 0;i<=lc;i++) {
+                let yGraph = (yMax - yMin) / lc * i;
+                let y = yMin + (yMax - yMin) / lc * i * yScale;
+                lines.push({y: y, yGraph: yGraph, text: translateY(yGraph)});
+            }
+            
+            return lines;
+        }        
+
+        const createYGridLines = (lines, cb) => {
+            
+            const hGridLines = [];
+            const hGridTexts = [];
+            const hGridLinesG =  state.elements.hGridLinesG;
+            
+            const lc = lines.length;
+            for(let i = 0;i < lc;i++) {
+                let y = lines[i].y;
+                const lEl = createSVG('path')
+                .style('stroke-width', '1px')
+                .style('stroke', 'lightblue')
+                .style('fill', 'none')
+                .style('vector-effect', 'non-scaling-stroke')
+                .attr('d',  'M0 ' + y + ' L' + (state.sizes.width) +' ' + y)
+                .addClass('animate-transform-opacity')
+                .appendTo(hGridLinesG);
+                hGridLines.push(lEl);
+                cb(lEl);
+    
+                const tEl = createSVG('text')
+                .attr('x',  '0')
+                .attr('y',  y - 5)
+                .attr('font-family', 'sans-serif')
+                .attr('font-size', '14')
+                .attr('fill', 'gray')
+                .textContent('' + lines[i].text)
+                .addClass('animate-transform-opacity')
+                .appendTo(hGridLinesG);
+                hGridTexts.push(tEl);
+                cb(tEl);
+    
+            }     
+            return {hGridLines, hGridTexts};       
+        }
+
+        const updateYGridLines = (gridElements, lines, cb) => {
+            const {hGridLines, hGridTexts} = gridElements;
+            const lc = lines.length;
+            for(let i = 0; i < lc; i++) {
+                let y = lines[i].y;
+                
+                hGridLines[i].attr('d',  'M0 ' + y + ' L' + (state.sizes.width) +' ' + y);
+                cb(hGridLines[i]);
+                
+                hGridTexts[i]
+                .textContent('' + lines[i].text)
+                .attr('x',  '0')
+                .attr('y',  y - 5);
+                cb(hGridTexts[i]);
+            }     
+        }        
 
         init();
     }

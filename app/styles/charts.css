@@ -14,5 +14,5 @@
 
 .animate-transform-opacity {
     transition: 0.15s linear;
-    transition-property: transform, opacity;
+    transition-property: transform, opacity, x, y, d;
 }
