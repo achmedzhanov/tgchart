@@ -297,9 +297,7 @@
             state.elements.linesGC.attr('transform', a2m(vm));
             state.elements.linesG.attr('transform', a2m(hm));
 
-            if(prevBounds[2] !== yMin || prevBounds[3] !== yMax) {
-                state.yAxis.updateRange(newBounds, state, vm);
-            }
+            state.yAxis.updateRange(newBounds, state, vm);
         }
 
         init();
