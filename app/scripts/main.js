@@ -10,11 +10,14 @@ function onDocumentReady(cb) {
 }
 
 onDocumentReady(() => {
-    let data = globalChartsData;
-    for(let i = 0; i<5; i++) {
-        window.createChart({
-            el: document.getElementById('chart' + i),
-            chartData: data[i]
-        });
-    }
+    fetch('scripts/data.json')
+    .then((r) => r.json())
+    .then((data) => {
+        for(let i = 0; i<5; i++) {
+            window.createChart({
+                el: document.getElementById('chart' + i),
+                chartData: data[i]
+            });
+        }
+    });
 });
