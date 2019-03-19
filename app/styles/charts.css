@@ -18,12 +18,23 @@
 
 .animate-transform-opacity {
     transition: 0.3s linear;
-    transition-property: transform, opacity, x, y, d;
+    transition-property: transform, opacity;
 }
 
 .disbled-line {
     opacity: 0;
 }
+
+.chart-y-line {
+    stroke: #f2f4f5;
+    stroke-width: 1px;
+    fill: none; 
+}
+
+/* .chart-y-line {
+    transition: 0.3s linear;
+    transition-property: transform, opacity, x, y, d;    
+} */
 
 .chart-toogle-buttons .button {
     color: #43484b;

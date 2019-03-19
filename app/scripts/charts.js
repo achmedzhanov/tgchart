@@ -8,7 +8,7 @@
         }, {})
     }
 
-    const mul = (m1, m2) => {
+    const mmul = (m1, m2) => {
         return [
         m1[0] * m2[0] + m1[2] * m2[1],
         m1[1] * m2[0] + m1[3]* m2[1],
@@ -18,6 +18,15 @@
         m1[1] * m2[4] + m1[3] * m2[5] + m1[5]
         ];
     }
+
+    const pmul = (p, m) => {
+        return [
+            m[0] * p[0] + m[2] * p[1] + m[4],
+            m[1]* p[0] + m[3] * p[1] + m[5]
+          ]
+    }
+
+    const q = (cb)=> setTimeout(cb,0); 
 
     class ElementBuilder {
         constructor(el) {
@@ -70,10 +79,7 @@
     const createSVG = (type) => new ElementBuilder(document.createElementNS('http://www.w3.org/2000/svg', type));
     const createEl = (type) => new ElementBuilder(document.createElement(type));
 
-
-    const xCoef = 1, xStep = 20;
-    let translateY = (y) => y;
-
+   
     function createChart(options) {
         const {el, chartData} = options;
         let {sizes} = options;
@@ -86,6 +92,8 @@
             columnsMap[c[0]] = c;
         }
         
+        const xCoef = 1, xStep = 20;
+
         let state = {
             disabled: U.keyBy(chartColumnsIds, (id) => [id, false]),
             visibleRange: { from: 0, to: 100},
@@ -93,7 +101,9 @@
             elements: {
                 linesElements: {},
 
-            }
+            },
+            transformY: (y) => y,
+            transformYWithScale: (y) => y
         };
    
         const getBounds = (s) => {
@@ -141,7 +151,10 @@
             
             const viewBox = [ 0, 0, sizes.width, sizes.height];
             
-            translateY = (y) => -(y - yMin) + yMax /* -yMin  */;    
+            state.transformY = (y, s) => -(y - yMin) + yMax /* -yMin  */;    
+            // see method vertMatrix
+            //TODO use same matrices for chart view port and axes!
+            state.transformYWithScale = (y, s) => (state.transformY(y) - yMax) * s  + s *  yMax; 
                 
             const svgEl = createSVG('svg')
             .style('width', sizes.width)
@@ -151,45 +164,19 @@
             
             const initalTransform = `matrix(${xScale}, 0, 0, ${yScale}, 0, 0)`;
 
-            const lc = 5;
-            const hGridLines = [];
-            //const hGridTexts = [];
+            // Y axis
             const hGridLinesG =  createSVG('g')
             .addClass('animate-transform')
             .style('vector-effect', 'non-scaling-stroke')
             .appendTo(svgEl);
+
+            const yAxis = new YAxis({containerEl: hGridLinesG.el});
+            yAxis.updateRange(fullBounds, state);
+            state.yAxis = yAxis;            
             
-            for(let i = 0;i<=lc;i++) {
-                // let yGraph = (yMax - yMin) / lc * i;
-                // let y = yMin + (yMax - yMin) / lc * i * yScale;
-                // const lEl = createSVG('path')
-                // .style('stroke-width', '1px')
-                // .style('stroke', 'lightblue')
-                // .style('fill', 'none')
-                // .style('vector-effect', 'non-scaling-stroke')
-                // .attr('d',  'M0 ' + y + ' L' + (xMax * xScale) +' ' + y)
-                // .appendTo(hGridLinesG);
-                // hGridLines.push(lEl);
-
-                // const tEl = createSVG('text')
-                // .attr('x',  '0')
-                // .attr('y',  y - 5)
-                // // .attr('font-family', ' "Helvetica Neue", Helvetica, Arial, sans-serif')
-                // .attr('font-family', 'sans-serif')
-                // .attr('font-size', '14')
-                // .attr('fill', 'gray')
-                // .textContent('' + translateY(yGraph))
-                // .appendTo(hGridLinesG);
-                // hGridTexts.push(tEl);
-
-            }    
-
             state.elements.hGridLinesG = hGridLinesG;
-            state.elements.hGridLines = hGridLines;
 
             const columnIds = Object.keys(types);
-
-            // ==>> TODO !!!! invert coordinates !!!!
 
             const lineElements = {};
             const linesGC = createSVG('g')
@@ -211,7 +198,7 @@
                         d += (pIdx == 1 ? 'M' : 'L');
                         d += (pIdx - 1) * xStep * xCoef;
                         d += ' ';
-                        d += translateY(c[pIdx]);
+                        d += state.transformY(c[pIdx]);
                     }
                     const p =createSVG('path')
                     .attr('d', d)
@@ -258,16 +245,21 @@
             const toggleGroupEl = createEl('div').appendTo(el);
             const tg = new ToggleGroup({containerEl: toggleGroupEl.el, names});
             tg.onToogle = (lId) => toggleLine(lId);
+
+            
         }
     
-        const vertMatrix = (bounds) => {
+        const verticalMatrix = (bounds) => {
             const fbyMax = state.fullBounds[3];
             const yMax = bounds[3];
             let yScale = state.sizes.height / yMax;
             const m1 = [1,0,0,1,0, yMax * yScale], m2 = [1,0,0, yScale,0,0], m3 =[1,0,0,1,0,-fbyMax];
-            const vt = mul(m1, mul(m2, m3));
-            const verticalTransform = 'matrix(' + vt[0] + ',' + vt[1] + ',' + vt[2] + ',' + vt[3] + ',' + vt[4] + ',' + vt[5] + ')';
-            return verticalTransform;
+            const vt = mmul(m1, mmul(m2, m3));
+            return vt;
+        }
+
+        const a2m = (m) => {
+            'matrix(' + m[0] + ',' + m[1] + ',' + m[2] + ',' + m[3] + ',' + m[4] + ',' + m[5] + ')'
         }
 
         const toggleLine = (lId) => {
@@ -294,92 +286,131 @@
             const [xMin, xMax, yMin, yMax] = newBounds;
 
             let xScale = state.sizes.width / xMax;
-            let yScale = state.sizes.height / yMax;
 
             const dx = -xMin /*, dy = 0 /*-yMin*/;
                         
-            //const oldVerticalTransform = vertMatrix(prevBounds);
-            const verticalTransform = vertMatrix(newBounds);
-            // if(oldVerticalTransform !== verticalTransform) {
-            //     state.elements.linesGC.el.animate([{
-            //         transform: oldVerticalTransform
-            //     }, {
-            //         transform: verticalTransform
-            //     }], {
-            //         duration: 150,
-            //         easing: 'linear',
-            //         direction: 'normal',
-            //         fill: 'both'
-            //     });
-            // }
+            const vm = verticalMatrix(newBounds);
 
             const horizontalTransform = `matrix(1,0,0,1,${dx},0) matrix(${xScale},0,0,1,0,0)`;
-            state.elements.linesGC.attr('transform', verticalTransform);
+            state.elements.linesGC.attr('transform', a2m(vm));
             state.elements.linesG.attr('transform', horizontalTransform);
 
-            //state.elements.hGridLinesG.attr('transform', verticalTransform);
-
             if(prevBounds[2] !== yMin || prevBounds[3] !== yMax) {
-                // update y axis lines
-                //state.elements.hGridLinesG.attr('transform', 'none');
-                const lc = 5;
-
-                const newLines = calcYAxis(yScale, prevBounds, lc);
-                // console.log('newLines', newLines);
-                
-                // TODO_create_elemts_pool!
-
-                const gridElements = createYGridLines(newLines, (el) => el.style('opacity', '0.1'));
-                const movedLines = calcYAxis(yScale, newBounds, lc);
-                // console.log('movedLines', movedLines);
-                setTimeout(() => {
-                updateYGridLines(gridElements, movedLines, (el) => el.style('opacity', '1'));
-                }, 0);
+                state.yAxis.updateRange(newBounds, state, vm);
             }
         }
 
-        const calcYAxis = (yScale, bounds, lc) => {
+        init();
+    }
+
+    class YAxis {
+        
+        constructor(options) {
+            this.el = new ElementBuilder(options.containerEl);
+            this.elementsCache = {};
+            this.currentRangeKey = null;
+            this.currentBounds = null;
+        }
+
+        updateRange(bounds, state, vm) {
+            this.sizes = state.sizes;
+            this.transformY = state.transformY;
+            this.transformYWithScale = state.transformYWithScale;
+
+            const [,,yMin,yMax] = bounds;
+            const rKey = this.rangeToKey(yMin,yMax);
+            if(this.currentRangeKey === rKey) return;
+            
+            let yScale = this.sizes.height / yMax;
+            const lc = 5;
+            if(!this.currentRangeKey) {
+                const newLines = this.calcYAxis(yScale, bounds, lc, vm);
+                const gridElements = this.createYGridLines(newLines, () => {});
+                this.elementsCache[rKey] = gridElements;
+            } else {
+                const prevBounds = this.currentBounds;
+                const prevYScale = this.sizes.height / prevBounds[3] /* yMax */;
+                {
+                    // move and hide lines
+                    const gridElements = this.elementsCache[this.currentRangeKey];
+                    //const newLines = this.calcYAxis(prevYScale, bounds, lc);
+                    const newLines = this.calcYAxis(yScale, prevBounds, lc, vm);
+                    q(() => {
+                        //this.updateYGridLines(gridElements, newLines, (el) => el.style('opacity', '0'));
+                        this.updateYGridLines(gridElements, newLines, () => {});
+                    }, 0);
+                }
+                {
+                    // move next lines
+                    // const lc = 5;
+                    // const newLines = calcYAxis(yScale, prevBounds, lc);
+                    // const gridElements = this.elementsCache[this.currentRangeKey] || 
+                    // createYGridLines(newLines, (el) => el.style('opacity', '0.1'));
+                    // const movedLines = calcYAxis(yScale, newBounds, lc);
+                    // // console.log('movedLines', movedLines);
+                    // q(() => {
+                    // updateYGridLines(gridElements, movedLines, (el) => el.style('opacity', '1'));
+                    // }, 0);
+                }
+            }
+
+            this.currentRangeKey = rKey;
+            this.currentBounds = bounds;
+        }
+
+        rangeToKey(yMin, yMax) {
+            return yMin + ':' + yMax;
+        }
+
+        calcYAxis(yScale, bounds, lc, vm) {
             const [, , yMin, yMax] = bounds;
             const lines = [];
 
             for(let i = 0;i<=lc;i++) {
-                let yGraph = (yMax - yMin) / lc * i;
-                let y = yMin + (yMax - yMin) / lc * i * yScale;
-                lines.push({y: y, yGraph: yGraph, text: translateY(yGraph)});
+                let yPoint = (yMax - yMin) / (lc + 1) * i;
+                let y = 0;
+                if(vm) {
+                    const p = pmul([0,this.transformY(yPoint)], vm);
+                    y = p[1];
+                } else {
+                    y = this.transformY(yPoint) * yScale;
+                }
+                
+                lines.push({y: y, yGraph: yPoint, text: yPoint});
             }
             
             return lines;
         }        
 
-        const createYGridLines = (lines, cb) => {
+        createYGridLines(lines, cb) {
             
             const hGridLines = [];
             const hGridTexts = [];
-            const hGridLinesG =  state.elements.hGridLinesG;
             
             const lc = lines.length;
             for(let i = 0;i < lc;i++) {
                 let y = lines[i].y;
                 const lEl = createSVG('path')
-                .style('stroke-width', '1px')
-                .style('stroke', 'lightblue')
                 .style('fill', 'none')
                 .style('vector-effect', 'non-scaling-stroke')
-                .attr('d',  'M0 ' + y + ' L' + (state.sizes.width) +' ' + y)
+                .attr('d',  'M0 0 L' + (this.sizes.width) +' 0')
+                .attr('transform',  'matrix(1,0,0,1,0,' + y + ')')
+                .addClass('chart-y-line')
                 .addClass('animate-transform-opacity')
-                .appendTo(hGridLinesG);
+                .appendTo(this.el);
                 hGridLines.push(lEl);
                 cb(lEl);
     
                 const tEl = createSVG('text')
                 .attr('x',  '0')
-                .attr('y',  y - 5)
+                .attr('y',  '0')
+                .attr('transform',  'matrix(1,0,0,1,0,' + (y - 5) + ')')
                 .attr('font-family', 'sans-serif')
                 .attr('font-size', '10')
                 .attr('fill', 'gray')
                 .textContent('' + lines[i].text)
                 .addClass('animate-transform-opacity')
-                .appendTo(hGridLinesG);
+                .appendTo(this.el);
                 hGridTexts.push(tEl);
                 cb(tEl);
     
@@ -387,24 +418,24 @@
             return {hGridLines, hGridTexts};       
         }
 
-        const updateYGridLines = (gridElements, lines, cb) => {
+        updateYGridLines(gridElements, lines, cb) {
             const {hGridLines, hGridTexts} = gridElements;
             const lc = lines.length;
             for(let i = 0; i < lc; i++) {
                 let y = lines[i].y;
                 
-                hGridLines[i].attr('d',  'M0 ' + y + ' L' + (state.sizes.width) +' ' + y);
+                hGridLines[i]
+                .attr('d',  'M0 0 L' + (this.sizes.width) +' 0')
+                .attr('transform',  'matrix(1,0,0,1,0,' + y + ')');
                 cb(hGridLines[i]);
                 
                 hGridTexts[i]
-                .textContent('' + lines[i].text)
-                .attr('x',  '0')
-                .attr('y',  y - 5);
+                //.textContent('' + lines[i].text)
+                .attr('transform',  'matrix(1,0,0,1,0,' + (y - 5) + ')');
                 cb(hGridTexts[i]);
             }     
         }        
 
-        init();
     }
 
     class ToggleGroup {
