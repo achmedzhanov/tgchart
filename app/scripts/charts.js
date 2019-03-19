@@ -107,7 +107,6 @@
 
             },
             transformY: (y) => y,
-            transformYWithScale: (y) => y
         };
    
         const getBounds = (s) => {
@@ -146,28 +145,26 @@
             
             const fullBounds = getBounds(null);
             state.fullBounds = fullBounds;
-            const [, xMax, yMin, yMax] = fullBounds;
+            const [, , yMin, yMax] = fullBounds;
 
             state.sizes = sizes;
 
-            let xScale = sizes.width / xMax;
-            let yScale = sizes.height / yMax;
-            
             const viewBox = [ 0, 0, sizes.width, sizes.height];
             
-            state.transformY = (y, s) => -(y - yMin) + yMax /* -yMin  */;    
+            state.transformY = (y) => -(y - yMin) + yMax /* -yMin  */;    
             // see method vertMatrix
             //TODO use same matrices for chart view port and axes!
-            state.transformYWithScale = (y, s) => (state.transformY(y) - yMax) * s  + s *  yMax; 
                 
             const svgEl = createSVG('svg')
             .style('width', sizes.width)
             .style('height', sizes.height)
             .attr('viewBox', `${viewBox[0]} ${viewBox[1]} ${viewBox[2]} ${viewBox[3]}`)
             .attr('zoom', 1);
-            
-            const initalTransform = `matrix(${xScale}, 0, 0, ${yScale}, 0, 0)`;
 
+            const bounds = fullBounds;
+            const vm = vMatrix(bounds);
+            const hm = hMatrix(bounds);
+            
             // Y axis
             const hGridLinesG =  createSVG('g')
             .addClass('animate-transform')
@@ -175,17 +172,12 @@
             .appendTo(svgEl);
 
             const yAxis = new YAxis({containerEl: hGridLinesG.el});
-            yAxis.updateRange(fullBounds, state);
+            yAxis.updateRange(fullBounds, state, vm);
             state.yAxis = yAxis;            
             
             state.elements.hGridLinesG = hGridLinesG;
 
             const columnIds = Object.keys(types);
-
-            const bounds = fullBounds;
-            const vm = vMatrix(bounds);
-            const hm = hMatrix(bounds);
-
             const lineElements = {};
             const linesGC = createSVG('g')
             .addClass('animate-transform')
@@ -297,12 +289,8 @@
             state.visibleRange = range;
             
             const newBounds = getBounds(state);
-            const [xMin, xMax, yMin, yMax] = newBounds;
+            const [, , yMin, yMax] = newBounds;
 
-            let xScale = state.sizes.width / xMax;
-
-            const dx = -xMin /*, dy = 0 /*-yMin*/;
-                        
             const vm = vMatrix(newBounds);
             const hm = hMatrix(newBounds);
 
@@ -329,66 +317,58 @@
         updateRange(bounds, state, vm) {
             this.sizes = state.sizes;
             this.transformY = state.transformY;
-            this.transformYWithScale = state.transformYWithScale;
 
             const [,,yMin,yMax] = bounds;
             const rKey = this.rangeToKey(yMin,yMax);
             if(this.currentRangeKey === rKey) return;
             
-            let yScale = this.sizes.height / yMax;
             const lc = 5;
             if(!this.currentRangeKey) {
-                const newLines = this.calcYAxis(yScale, bounds, lc, vm);
+                const newLines = this.calcYAxis(bounds, lc, vm);
                 const gridElements = this.createYGridLines(newLines, () => {});
                 this.elementsCache[rKey] = gridElements;
             } else {
                 const prevBounds = this.currentBounds;
-                const prevYScale = this.sizes.height / prevBounds[3] /* yMax */;
                 {
                     // move and hide lines
                     const gridElements = this.elementsCache[this.currentRangeKey];
-                    //const newLines = this.calcYAxis(prevYScale, bounds, lc);
-                    const newLines = this.calcYAxis(yScale, prevBounds, lc, vm);
+                    //const newLines = this.calcYAxis(bounds, lc);
+                    const newLines = this.calcYAxis(prevBounds, lc, vm);
                     q(() => {
-                        //this.updateYGridLines(gridElements, newLines, (el) => el.style('opacity', '0'));
-                        this.updateYGridLines(gridElements, newLines, () => {});
+                        this.updateYGridLines(gridElements, newLines, (el) => el.style('opacity', '0'));
+                        //this.updateYGridLines(gridElements, newLines, () => {});
                     }, 0);
                 }
                 {
-                    // move next lines
-                    // const lc = 5;
-                    // const newLines = calcYAxis(yScale, prevBounds, lc);
-                    // const gridElements = this.elementsCache[this.currentRangeKey] || 
-                    // createYGridLines(newLines, (el) => el.style('opacity', '0.1'));
-                    // const movedLines = calcYAxis(yScale, newBounds, lc);
-                    // // console.log('movedLines', movedLines);
-                    // q(() => {
-                    // updateYGridLines(gridElements, movedLines, (el) => el.style('opacity', '1'));
-                    // }, 0);
+                    const newLines = this.calcYAxis(bounds, lc, this.currentVM);
+                    // TODO get elements from cache!
+                    const gridElements = this.elementsCache[this.rKey] || 
+                        this.createYGridLines(newLines, (el) => el.style('opacity', '0'));
+                    const movedLines = this.calcYAxis(bounds, lc, vm);
+                    this.elementsCache[rKey] = gridElements;
+                    q(() => {
+                    this.updateYGridLines(gridElements, movedLines, (el) => el.style('opacity', '1'));
+                    }, 0);
                 }
             }
 
             this.currentRangeKey = rKey;
             this.currentBounds = bounds;
+            this.currentVM = vm;
         }
 
         rangeToKey(yMin, yMax) {
             return yMin + ':' + yMax;
         }
 
-        calcYAxis(yScale, bounds, lc, vm) {
+        calcYAxis(bounds, lc, vm) {
             const [, , yMin, yMax] = bounds;
             const lines = [];
 
             for(let i = 0;i<=lc;i++) {
                 let yPoint = (yMax - yMin) / (lc + 1) * i;
-                let y = 0;
-                if(vm) {
-                    const p = pmul([0,this.transformY(yPoint)], vm);
-                    y = p[1];
-                } else {
-                    y = this.transformY(yPoint) * yScale;
-                }
+                const p = pmul([0,this.transformY(yPoint)], vm);
+                const y = p[1];
                 
                 lines.push({y: y, yGraph: yPoint, text: yPoint});
             }
