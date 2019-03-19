@@ -26,6 +26,10 @@
           ]
     }
 
+    const a2m = (m) => {
+        return 'matrix(' + m[0] + ',' + m[1] + ',' + m[2] + ',' + m[3] + ',' + m[4] + ',' + m[5] + ')'
+    }    
+
     const q = (cb)=> setTimeout(cb,0); 
 
     class ElementBuilder {
@@ -178,12 +182,17 @@
 
             const columnIds = Object.keys(types);
 
+            const bounds = fullBounds;
+            const vm = vMatrix(bounds);
+            const hm = hMatrix(bounds);
+
             const lineElements = {};
             const linesGC = createSVG('g')
             .addClass('animate-transform')
-            .attr('transform', initalTransform)
+            .attr('transform', a2m(vm))
             .appendTo(svgEl);
             const linesG = createSVG('g')
+            .attr('transform', a2m(hm))
             .appendTo(linesGC);
 
             for (let columnIndex = 0; columnIndex< columnIds.length; columnIndex++) {
@@ -249,7 +258,7 @@
             
         }
     
-        const verticalMatrix = (bounds) => {
+        const vMatrix = (bounds) => {
             const fbyMax = state.fullBounds[3];
             const yMax = bounds[3];
             let yScale = state.sizes.height / yMax;
@@ -258,10 +267,15 @@
             return vt;
         }
 
-        const a2m = (m) => {
-            'matrix(' + m[0] + ',' + m[1] + ',' + m[2] + ',' + m[3] + ',' + m[4] + ',' + m[5] + ')'
+        const hMatrix = (bounds) => {
+            const [xMin, xMax,] = bounds;
+            let xScale = state.sizes.width / xMax;
+            const dx = -xMin /*, dy = 0 /*-yMin*/;
+            const m = mmul([1,0,0,1,dx,0], [xScale,0,0,1,0,0]);
+            return m;
         }
 
+        
         const toggleLine = (lId) => {
             state.disabled[lId] = !state.disabled[lId];
             const lEl = state.elements.linesElements[lId];
@@ -289,11 +303,11 @@
 
             const dx = -xMin /*, dy = 0 /*-yMin*/;
                         
-            const vm = verticalMatrix(newBounds);
+            const vm = vMatrix(newBounds);
+            const hm = hMatrix(newBounds);
 
-            const horizontalTransform = `matrix(1,0,0,1,${dx},0) matrix(${xScale},0,0,1,0,0)`;
             state.elements.linesGC.attr('transform', a2m(vm));
-            state.elements.linesG.attr('transform', horizontalTransform);
+            state.elements.linesG.attr('transform', a2m(hm));
 
             if(prevBounds[2] !== yMin || prevBounds[3] !== yMax) {
                 state.yAxis.updateRange(newBounds, state, vm);
