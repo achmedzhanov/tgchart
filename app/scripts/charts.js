@@ -33,6 +33,11 @@
             this._el.textContent = value;
             return this;
         }
+
+        innerText(value) {
+            this._el.innerText = value;
+            return this;
+        }        
     
         style(name, value) {
             this._el.style[name] = value;
@@ -43,7 +48,12 @@
             this._el.classList.add(c);
             return this;
         }
-    
+
+        removeClass(c) {
+            this._el.classList.remove(c);
+            return this;
+        }
+        
         appendTo(parent) {
             if(parent.el) 
                 parent.el.appendChild(this._el);
@@ -57,6 +67,10 @@
         }
     }
 
+    const createSVG = (type) => new ElementBuilder(document.createElementNS('http://www.w3.org/2000/svg', type));
+    const createEl = (type) => new ElementBuilder(document.createElement(type));
+
+
     const xCoef = 1, xStep = 20;
     let translateY = (y) => y;
 
@@ -64,7 +78,7 @@
         const {el, chartData} = options;
         let {sizes} = options;
         sizes = sizes || {width: 500, height: 250};
-        const {colors, columns, /*names,*/ types} = chartData;
+        const {colors, columns, names, types} = chartData;
         const chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
         const xColumnId = Object.keys(types).find(t => types[t] === 'x');
         const columnsMap = {};
@@ -81,10 +95,7 @@
 
             }
         };
-
-        const createSVG = (type) => new ElementBuilder(document.createElementNS('http://www.w3.org/2000/svg', type));
-        const createEl = (type) => new ElementBuilder(document.createElement(type));
-    
+   
         const getBounds = (s) => {
             // const ty = !!s;
             s = s || {
@@ -182,17 +193,17 @@
 
             const lineElements = {};
             const linesGC = createSVG('g')
-            //.addClass('animate-transform')
+            .addClass('animate-transform')
             .attr('transform', initalTransform)
             .appendTo(svgEl);
             const linesG = createSVG('g')
             .appendTo(linesGC);
 
             for (let columnIndex = 0; columnIndex< columnIds.length; columnIndex++) {
-                const columnName = columnIds[columnIndex], 
-                    t = types[columnName],
-                    color = colors[columnName],
-                    c = columnsMap[columnName];
+                const lId = columnIds[columnIndex], 
+                    t = types[lId],
+                    color = colors[lId],
+                    c = columnsMap[lId];
                 
                 if (t === 'line') {
                     let d = '';
@@ -208,9 +219,10 @@
                     .style('stroke-width', '2px')
                     .style('vector-effect', 'non-scaling-stroke')
                     .style('fill', 'none')
+                    .addClass('animate-opacity')
                     .appendTo(linesG);
                     
-                    lineElements[columnName] = p.el; 
+                    lineElements[lId] = p; 
                 } else if (t === 'x') {
                     // todo create x axis
                 }
@@ -242,6 +254,10 @@
             sliderEl.oninput = onSliderChange;
 
             el.appendChild(sliderEl);
+
+            const toggleGroupEl = createEl('div').appendTo(el);
+            const tg = new ToggleGroup({containerEl: toggleGroupEl.el, names});
+            tg.onToogle = (lId) => toggleLine(lId);
         }
     
         const vertMatrix = (bounds) => {
@@ -254,17 +270,26 @@
             return verticalTransform;
         }
 
-        const setRange = (range) => {
+        const toggleLine = (lId) => {
+            state.disabled[lId] = !state.disabled[lId];
+            const lEl = state.elements.linesElements[lId];
+            if(state.disabled[lId]) {
+                lEl.addClass('disbled-line');
+            } else {
+                lEl.removeClass('disbled-line');
+            }
+            setRange(state.visibleRange, true);
+        }
+
+        const setRange = (range, force) => {
             
             range = range || {from: 0, to: 100};
-            if(state.visibleRange.from == range.from && state.visibleRange.to == range.to) return;
+            if(state.visibleRange.from == range.from && state.visibleRange.to == range.to && !force) return;
             
             const prevBounds = getBounds(state);
 
             state.visibleRange = range;
             
-            const fbyMax = state.fullBounds[3];
-
             const newBounds = getBounds(state);
             const [xMin, xMax, yMin, yMax] = newBounds;
 
@@ -273,23 +298,23 @@
 
             const dx = -xMin /*, dy = 0 /*-yMin*/;
                         
-            const oldVerticalTransform = vertMatrix(prevBounds);
+            //const oldVerticalTransform = vertMatrix(prevBounds);
             const verticalTransform = vertMatrix(newBounds);
-            if(oldVerticalTransform !== verticalTransform) {
-                state.elements.linesGC.el.animate([{
-                    transform: oldVerticalTransform
-                }, {
-                    transform: verticalTransform
-                }], {
-                    duration: 150,
-                    easing: 'linear',
-                    direction: 'normal',
-                    fill: 'both'
-                });
-            }
+            // if(oldVerticalTransform !== verticalTransform) {
+            //     state.elements.linesGC.el.animate([{
+            //         transform: oldVerticalTransform
+            //     }, {
+            //         transform: verticalTransform
+            //     }], {
+            //         duration: 150,
+            //         easing: 'linear',
+            //         direction: 'normal',
+            //         fill: 'both'
+            //     });
+            // }
 
             const horizontalTransform = `matrix(1,0,0,1,${dx},0) matrix(${xScale},0,0,1,0,0)`;
-            //state.elements.linesGC.attr('transform', verticalTransform);
+            state.elements.linesGC.attr('transform', verticalTransform);
             state.elements.linesG.attr('transform', horizontalTransform);
 
             //state.elements.hGridLinesG.attr('transform', verticalTransform);
@@ -350,7 +375,7 @@
                 .attr('x',  '0')
                 .attr('y',  y - 5)
                 .attr('font-family', 'sans-serif')
-                .attr('font-size', '14')
+                .attr('font-size', '10')
                 .attr('fill', 'gray')
                 .textContent('' + lines[i].text)
                 .addClass('animate-transform-opacity')
@@ -381,16 +406,41 @@
 
         init();
     }
-    
-    function onDocumentReady(cb) {
-        if(document.readyState !== 'loading') {
-            cb();
-        } else {
-            document.addEventListener('DOMContentLoaded', cb);
-        }
-    }    
 
-    g.onDocumentReady = onDocumentReady;
+    class ToggleGroup {
+        
+        constructor(options) {
+            const {names} = options;
+            this.names = names;
+            this.el = new ElementBuilder(options.containerEl);
+            this.onToogle = () => {};
+            this.init();
+        }
+
+        init() {
+            this.el.addClass('chart-toogle-buttons');
+            for (let k of Object.keys(this.names)) {
+                let toggled = true;
+                const n = this.names[k];
+                const bEl = createEl('button')
+                .addClass('button')
+                .addClass('toggled')
+                .innerText(n)
+                .appendTo(this.el);
+
+                bEl.el.onclick = () => {
+                    toggled = !toggled;
+                    if(toggled) {
+                        bEl.addClass('toggled');
+                    } else {
+                        bEl.removeClass('toggled');
+                    }
+                    this.onToogle(k);
+                };
+            }
+        }
+    }
+
     g.createChart = createChart;
 
 })(window);

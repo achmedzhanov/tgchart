@@ -9,10 +9,43 @@
 }
 
 .animate-transform {
-    transition: transform 0.15s linear;
+    transition: transform 0.3s linear;
+}
+
+.animate-opacity {
+    transition: opacity 0.3s linear;
 }
 
 .animate-transform-opacity {
-    transition: 0.15s linear;
+    transition: 0.3s linear;
     transition-property: transform, opacity, x, y, d;
+}
+
+.disbled-line {
+    opacity: 0;
+}
+
+.chart-toogle-buttons .button {
+    color: #43484b;
+    border-color: #e6ecf0;
+    border-radius: 1000px;
+
+    /* border: 0;
+    border-radius: 0.25rem;
+    background: #1E88E5;
+    color: white;
+    font-family: system-ui, sans-serif;
+    font-size: 1rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-decoration: none;
+    padding: 0.25rem 0.5rem;
+    margin: 0.25rem;
+    cursor: pointer;     */
+}
+
+.chart-toogle-buttons .button:focus {outline:0;}
+
+.chart-toogle-buttons .button .toggled {
+    color: red;
 }
