@@ -162,16 +162,20 @@
             const [, , yMin, yMax] = fullBounds;
 
             state.sizes = sizes;
-
-            const viewBox = [ 0, 0, sizes.width, sizes.height];
+            
+            const xAxisHeight = 20;
+            const svgWidth = sizes.width;
+            const svgHeight = sizes.height + xAxisHeight;
+            
+            const viewBox = [ 0, 0, svgWidth, svgHeight];
             
             state.transformY = (y) => -(y - yMin) + yMax /* -yMin  */;    
             // see method vertMatrix
             //TODO use same matrices for chart view port and axes!
-                
+            
             const svgEl = createSVG('svg')
-            .style('width', sizes.width)
-            .style('height', sizes.height)
+            .style('width', svgWidth)
+            .style('height', svgHeight)
             .attr('viewBox', `${viewBox[0]} ${viewBox[1]} ${viewBox[2]} ${viewBox[3]}`)
             .attr('zoom', 1);
 
@@ -194,7 +198,7 @@
             const xAxisG =  createSVG('g')
             .addClass('animate-transform')
             .appendTo(svgEl)
-            .attr('transform', 'translate(0, 200)');
+            .attr('transform', 'translate(0, ' + (state.sizes.height + xAxisHeight * 0.8 ) + ')');
             state.elements.xAxisG = xAxisG;            
 
             const xAxis = new XAxis({containerEl: xAxisG.el, xColumn: xColumn});
@@ -388,7 +392,7 @@
 
             for(let i=0;i<this.textElements.length;i++) {
                 
-                const visible = ((i % visibleK) ==0);
+                const visible = ((i % visibleK) ==0) /*&& i !== 0 && i !== this.textElements.length - 1*/;
                 this.textElements[i].el.attr('opacity', visible ? 1 : 0);
 
                 this.textElements[i].el.attr('transform', a2m([1,0,0,1,pmulX(this.textElements[i].x, hm),0]));
@@ -399,7 +403,7 @@
 
         getLabelWidth() {
             // todo create tmp label and get getBoundClientRect
-            return 5 * 10;
+            return 5.5 * 10;
         }
     }
 
@@ -505,6 +509,7 @@
                 .attr('font-size', '10')
                 .attr('fill', 'gray')
                 .textContent('' + lines[i].text)
+                .addClass('chart-y-line-text')
                 .addClass('animate-transform-opacity')
                 .appendTo(this.el);
                 hGridTexts.push(tEl);
