@@ -38,7 +38,8 @@
 }
 
 .chart-x-line-text {
-    text-anchor: middle;
+    /*text-anchor: middle;*/
+    text-anchor: start;
 }
 
 /* .chart-y-line {

@@ -345,12 +345,16 @@
         init(hm) {
             const xPoints = this.xColumn.slice(1);
 
+            this.textElements = new Array(xPoints.length);
+
             const userLang = getNavigatorLanguage();
             //const dateLabel = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             const dateLabel = { month: 'short', day: 'numeric' };
 
-            for(let i=0; i< xPoints.length;i++) {
+            this.getOrCreateTextEl = (i) =>  {
                 
+                if(this.textElements[i]) return this.textElements[i];
+
                 const labelText = new Date(xPoints[i]).toLocaleDateString(userLang, dateLabel);
                 const x = i * xStep;
 
@@ -363,7 +367,11 @@
                 .addClass('animate-opacity')
                 .appendTo(this.el);
                 
-                this.textElements.push({el: tEl, x: x});
+                const v = {el: tEl, x: x};
+
+                this.textElements[i] = v;
+
+                return v;
             }            
         }
 
@@ -393,9 +401,12 @@
             for(let i=0;i<this.textElements.length;i++) {
                 
                 const visible = ((i % visibleK) ==0) /*&& i !== 0 && i !== this.textElements.length - 1*/;
-                this.textElements[i].el.attr('opacity', visible ? 1 : 0);
-
-                this.textElements[i].el.attr('transform', a2m([1,0,0,1,pmulX(this.textElements[i].x, hm),0]));
+                const isLabelInsideBouds = bounds[0] <= i * xStep && i * xStep <= bounds[1];
+                let elHolder = visible && isLabelInsideBouds ? this.getOrCreateTextEl(i) : this.textElements[i];
+                if(elHolder) {
+                    elHolder.el.attr('opacity', visible ? 1 : 0);
+                    elHolder.el.attr('transform', a2m([1,0,0,1,pmulX(elHolder.x, hm),0]));
+                }
             }
 
             this.currentHM = hm;
