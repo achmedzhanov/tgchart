@@ -26,11 +26,27 @@
           ]
     }
 
+    const pmulX = (x, m) => {
+        return pmul([x,0], m)[0];
+    }
+
+    const pmulY = (y, m) => {
+        return pmul([0,y], m)[1];
+    }    
+
     const a2m = (m) => {
         return 'matrix(' + m[0] + ',' + m[1] + ',' + m[2] + ',' + m[3] + ',' + m[4] + ',' + m[5] + ')'
     }    
 
     const q = (cb)=> setTimeout(cb,0); 
+
+    const getNavigatorLanguage = () => {
+        if (navigator.languages && navigator.languages.length) {
+          return navigator.languages[0];
+        } else {
+          return navigator.userLanguage || navigator.language || navigator.browserLanguage || 'en';
+        }
+      }
 
     class ElementBuilder {
         constructor(el) {
@@ -83,6 +99,7 @@
     const createSVG = (type) => new ElementBuilder(document.createElementNS('http://www.w3.org/2000/svg', type));
     const createEl = (type) => new ElementBuilder(document.createElement(type));
 
+    const xStep = 20;
    
     function createChart(options) {
         const {el, chartData} = options;
@@ -90,14 +107,13 @@
         sizes = sizes || {width: 500, height: 250};
         const {colors, columns, names, types} = chartData;
         const chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
-        const xColumnId = Object.keys(types).find(t => types[t] === 'x');
         const columnsMap = {};
         for(let c of columns) {
             columnsMap[c[0]] = c;
         }
+        const xColumnId = Object.keys(types).find(t => types[t] === 'x');
+        const xColumn = columnsMap[xColumnId];
         
-        const xCoef = 1, xStep = 20;
-
         let state = {
             disabled: U.keyBy(chartColumnsIds, (id) => [id, false]),
             visibleRange: { from: 0, to: 100},
@@ -117,8 +133,6 @@
             }
             
             const visibleLines = chartColumnsIds.filter(lid => !s.disabled[lid]).map(lid => columnsMap[lid]);
-            const xColumn = columnsMap[xColumnId];
-            // TODO line contains only one point, take into sibling points
 
             const visibleIndexRange = {
                 from: 1 + (xColumn.length - 1) * s.visibleRange.from / 100,
@@ -166,16 +180,26 @@
             const hm = hMatrix(bounds);
             
             // Y axis
-            const hGridLinesG =  createSVG('g')
+            const yAxisG =  createSVG('g')
             .addClass('animate-transform')
             .style('vector-effect', 'non-scaling-stroke')
             .appendTo(svgEl);
+            state.elements.hGridLinesG = yAxisG;
 
-            const yAxis = new YAxis({containerEl: hGridLinesG.el});
+            const yAxis = new YAxis({containerEl: yAxisG.el});
             yAxis.updateRange(fullBounds, state, vm);
-            state.yAxis = yAxis;            
+            state.yAxis = yAxis;
             
-            state.elements.hGridLinesG = hGridLinesG;
+            //X axis
+            const xAxisG =  createSVG('g')
+            .addClass('animate-transform')
+            .appendTo(svgEl)
+            .attr('transform', 'translate(0, 200)');
+            state.elements.xAxisG = xAxisG;            
+
+            const xAxis = new XAxis({containerEl: xAxisG.el, xColumn: xColumn});
+            xAxis.updateRange(fullBounds, state, hm);
+            state.xAxis = xAxis;
 
             const columnIds = Object.keys(types);
             const lineElements = {};
@@ -197,7 +221,7 @@
                     let d = '';
                     for(let pIdx = 1; pIdx < c.length; pIdx++) {
                         d += (pIdx == 1 ? 'M' : 'L');
-                        d += (pIdx - 1) * xStep * xCoef;
+                        d += (pIdx - 1) * xStep;
                         d += ' ';
                         d += state.transformY(c[pIdx]);
                     }
@@ -211,9 +235,7 @@
                     .appendTo(linesG);
                     
                     lineElements[lId] = p; 
-                } else if (t === 'x') {
-                    // todo create x axis
-                }
+                } 
             }
 
             state.elements.linesElements = lineElements;
@@ -279,17 +301,19 @@
             setRange(state.visibleRange, true);
         }
 
+        // const beautyfyBounds = (bounds) => {
+        //     // find nearest netural number divided to six OR 10, 50, 100
+        //     return bounds;
+        // }
+
         const setRange = (range, force) => {
             
             range = range || {from: 0, to: 100};
             if(state.visibleRange.from == range.from && state.visibleRange.to == range.to && !force) return;
             
-            const prevBounds = getBounds(state);
-
             state.visibleRange = range;
             
             const newBounds = getBounds(state);
-            const [, , yMin, yMax] = newBounds;
 
             const vm = vMatrix(newBounds);
             const hm = hMatrix(newBounds);
@@ -298,9 +322,54 @@
             state.elements.linesG.attr('transform', a2m(hm));
 
             state.yAxis.updateRange(newBounds, state, vm);
+            state.xAxis.updateRange(newBounds, state, hm);
         }
 
         init();
+    }
+
+    class XAxis {
+        constructor(options) {
+            this.el = new ElementBuilder(options.containerEl);
+            this.xColumn = options.xColumn;
+            this.elementsCache = {};
+            this.currentRangeKey = null;
+            this.currentBounds = null;
+            this.textElements = [];
+        }
+
+        init(hm) {
+            const xPoints = this.xColumn.slice(1);
+
+            const userLang = getNavigatorLanguage;
+
+            for(let i=0; i< xPoints.length;i++) {
+                
+                const labelText = new Date(xPoints[i]).toLocaleDateString(userLang);
+                const x = i * xStep;
+
+                const tEl = createSVG('text')
+                .attr('x',  '0')
+                .attr('y',  '0')
+                .attr('transform', a2m([1,0,0,1,pmulX(x, hm),0]))
+                .textContent('' + labelText)
+                .addClass('chart-x-line-text')
+                .addClass('animate-opacity')
+                .appendTo(this.el);
+                
+                this.textElements.push({el: tEl, x: x});
+            }            
+        }
+
+        updateRange(bounds, state, hm) {
+            if(this.textElements.length === 0) {
+                this.init(hm);
+            }
+            for(let i=0;i<this.textElements.length;i++) {
+                
+                this.textElements[i].el.attr('transform', a2m([1,0,0,1,pmulX(this.textElements[i].x, hm),0]));
+            }
+        }
     }
 
     class YAxis {
@@ -365,8 +434,7 @@
 
             for(let i = 0;i<=lc;i++) {
                 let yPoint = (yMax - yMin) / (lc + 1) * i;
-                const p = pmul([0,this.transformY(yPoint)], vm);
-                const y = p[1];
+                const y = pmulY(this.transformY(yPoint), vm);
                 
                 lines.push({y: y, yGraph: yPoint, text: yPoint});
             }
