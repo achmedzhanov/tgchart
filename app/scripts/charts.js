@@ -341,11 +341,13 @@
         init(hm) {
             const xPoints = this.xColumn.slice(1);
 
-            const userLang = getNavigatorLanguage;
+            const userLang = getNavigatorLanguage();
+            //const dateLabel = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            const dateLabel = { month: 'short', day: 'numeric' };
 
             for(let i=0; i< xPoints.length;i++) {
                 
-                const labelText = new Date(xPoints[i]).toLocaleDateString(userLang);
+                const labelText = new Date(xPoints[i]).toLocaleDateString(userLang, dateLabel);
                 const x = i * xStep;
 
                 const tEl = createSVG('text')
@@ -361,14 +363,43 @@
             }            
         }
 
+        finPowerTwo(n) {
+            let v = 1;
+            if(n <= v) return 1;
+            for(let i = 0;i<32;i++) {
+                if(n <= (v = 2**i)) return v;
+            }
+            return v; 
+        }
+
         updateRange(bounds, state, hm) {
             if(this.textElements.length === 0) {
                 this.init(hm);
             }
+
+            // todo check same xscale!
+
+            // eval visible labels
+            const maxLabelInViewPort = Math.trunc(state.sizes.width / this.getLabelWidth ()); // todo some coef for padding
+            const w = bounds[1] - bounds[0];
+            const actualLabelInViewPort = w / xStep;
+            const k = actualLabelInViewPort / maxLabelInViewPort;
+            const visibleK = this.finPowerTwo(k);
+
             for(let i=0;i<this.textElements.length;i++) {
                 
+                const visible = ((i % visibleK) ==0);
+                this.textElements[i].el.attr('opacity', visible ? 1 : 0);
+
                 this.textElements[i].el.attr('transform', a2m([1,0,0,1,pmulX(this.textElements[i].x, hm),0]));
             }
+
+            this.currentHM = hm;
+        }
+
+        getLabelWidth() {
+            // todo create tmp label and get getBoundClientRect
+            return 5 * 10;
         }
     }
 
@@ -428,12 +459,17 @@
             return yMin + ':' + yMax;
         }
 
+        prettyY(y) {
+            return Math.round(y);
+        }
+
         calcYAxis(bounds, lc, vm) {
             const [, , yMin, yMax] = bounds;
             const lines = [];
 
             for(let i = 0;i<=lc;i++) {
                 let yPoint = (yMax - yMin) / (lc + 1) * i;
+                yPoint = this.prettyY(yPoint);
                 const y = pmulY(this.transformY(yPoint), vm);
                 
                 lines.push({y: y, yGraph: yPoint, text: yPoint});

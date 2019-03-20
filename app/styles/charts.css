@@ -37,6 +37,10 @@
     fill: #96a2aa;   
 }
 
+.chart-x-line-text {
+    text-anchor: middle;
+}
+
 /* .chart-y-line {
     transition: 0.3s linear;
     transition-property: transform, opacity, x, y, d;    
