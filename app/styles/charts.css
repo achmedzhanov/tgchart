@@ -78,6 +78,7 @@ body.day {
     width: 5px;
     cursor: w-resize;
     z-index: 3;
+    touch-action: none;
 }
 
 .chart-range-selector .left-curtain, .right-curtain {

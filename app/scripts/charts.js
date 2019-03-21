@@ -657,11 +657,11 @@
         let finished = false;
         const finish = () => {
             finished = true;
-            document.removeEventListener('mousemove', onMouseMove);
-            document.removeEventListener('mouseup', onMouseUp);
+            document.removeEventListener('pointermove', onMouseMove);
+            document.removeEventListener('pointerup', onMouseUp);
         };
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
+        document.addEventListener('pointermove', onMouseMove);
+        document.addEventListener('pointerup', onMouseUp);
     }
 
     function limit(v, min, max) {
@@ -688,9 +688,9 @@
 
             // use pointer events???
 
-            this.sliderEl.on('mousedown', (e) => this.onSliderMouseDown(e));
-            this.leftGripperEl.on('mousedown', (e) => this.onLeftGripperMouseDown(e));
-            this.rightGripperEl.on('mousedown', (e) => this.onRightGripperMouseDown(e));
+            this.sliderEl.on('pointerdown', (e) => this.onSliderMouseDown(e));
+            this.leftGripperEl.on('pointerdown', (e) => this.onLeftGripperMouseDown(e));
+            this.rightGripperEl.on('pointerdown', (e) => this.onRightGripperMouseDown(e));
             this.positionByRange();
         }
         positionByRange() {
@@ -727,7 +727,6 @@
             const minWidth = this.minRamgeWidth / 100 * w;
             const sliderWidth = Math.max(startState.rightPos - startState.leftPos, minWidth);
             dnd(e, (dndEvent) => {
-                
                 const leftPos = limit(startState.leftPos + dndEvent.delta.x, 0, w - sliderWidth);
                 const rightPos = leftPos + sliderWidth;
                 this.state = {...this.state, leftPos, rightPos};
