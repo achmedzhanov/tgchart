@@ -126,7 +126,8 @@
             },
             transformY: (y) => y,
         };
-   
+        
+        // TODO remove duplicated method!
         const getBounds = (s) => {
             // const ty = !!s;
             s = s || {
@@ -174,7 +175,6 @@
             .attr('viewBox', `${viewBox[0]} ${viewBox[1]} ${viewBox[2]} ${viewBox[3]}`)
             .attr('zoom', 1);
 
-
             // Y axis
             const yAxisG =  createSVG('g')
             .addClass('animate-transform')
@@ -208,6 +208,21 @@
             
             svgEl.appendTo(el);
 
+            const miniMapHeight = 30;
+            const miniMapBlockEl = createEl('div').appendTo(el);
+            const miniMapEl = createSVG('svg').attr('width', state.sizes.width).attr('height', miniMapHeight).appendTo(miniMapBlockEl);
+            const miniCVP = new ChartViewPort({ 
+                containerEl: miniMapEl.el, 
+                chartData: chartData, 
+                sizes: { width: state.sizes.width, height: miniMapHeight},
+                strokeWidth: '1px'
+            });
+            miniCVP.init();
+            state.miniCVP = miniCVP;
+            miniCVP.updateRange({from: 0, to: 100}, true)
+
+            // create svg, create lines
+
             const sliderEl = createEl('input')
             .attr('type', 'range')
             .attr('min', '0')
@@ -233,6 +248,7 @@
        
         const toggleLine = (lId) => {
             state.cvp.toggleLine(lId);
+            state.miniCVP.toggleLine(lId);
         }
 
         // const beautyfyBounds = (bounds) => {
@@ -248,7 +264,7 @@
             this.el = new ElementBuilder(options.containerEl);
             this.chartData = options.chartData;
             this.sizes = options.sizes;
-            this.stroke = options.stroke || 1;
+            this.strokeWidth = options.strokeWidth || 2;
             this.disabled = {};
             this.visibleRange = {from: 0, to: 100};
 
@@ -299,7 +315,7 @@
                     const p =createSVG('path')
                     .attr('d', d)
                     .style('stroke', color)
-                    .style('stroke-width', '2px')
+                    .style('stroke-width', this.strokeWidth)
                     .style('vector-effect', 'non-scaling-stroke')
                     .style('fill', 'none')
                     .addClass('animate-opacity')
