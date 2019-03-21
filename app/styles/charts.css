@@ -1,3 +1,7 @@
+body.day {
+    background-color:  #ffffff;
+}
+
 .chart-container svg text{
     -webkit-user-select: none;
     -moz-user-select: none;
@@ -51,7 +55,45 @@
 } */
 
 
+.chart-range-selector {
+    position: relative;
+}
 
+.chart-range-selector .slider {
+    position: absolute;
+    height: 100%;
+    top: 0;
+    background-color: transparent;
+    border-top: 1px solid #e0eaf0;
+    border-bottom:  1px solid #e0eaf0;
+    box-sizing: border-box;
+    z-index: 2;
+}
+
+.chart-range-selector .left-gripper, .chart-range-selector .right-gripper {
+    position: absolute;
+    height: 100%;
+    top: 0;
+    background-color: #e0eaf0;
+    width: 5px;
+    cursor: w-resize;
+    z-index: 3;
+}
+
+.chart-range-selector .left-curtain, .right-curtain {
+    /*background-color: rgba(206, 227,240, .5);*/
+    background-color: rgba(223, 234, 240, .5);
+    position: absolute;
+    height: 100%;
+    top: 0;    
+    z-index: 1;
+}
+.chart-range-selector .left-curtain {
+    left: 0;
+}
+.chart-range-selector .right-curtain {
+    right: 0;
+}
 
 .chart-toogle-buttons .button {
     color: #43484b;

@@ -60,6 +60,11 @@
             return this;
         }
 
+        on(name, h) {
+            this._el.addEventListener(name, h, false);
+            return this;
+        }
+
         textContent(value) {
             this._el.textContent = value;
             return this;
@@ -163,17 +168,22 @@
             const svgWidth = sizes.width;
             const svgHeight = sizes.height + xAxisHeight;
             
-            const viewBox = [ 0, 0, svgWidth, svgHeight];
-            
             state.transformY = (y) => -(y - yMin) + yMax /* -yMin  */;    
             // see method vertMatrix
             //TODO use same matrices for chart view port and axes!
+
+            const setSvgSizes = (svgElBuilder, w,h, p) => {
+                const vb = [-p.left, - p.top, w+ p.right, h+ p.bottom];
+                svgElBuilder
+                .style('width', w + (p.left + p.right))
+                .style('height', h + (p.left + p.bottom))
+                .attr('viewBox', `${vb[0]} ${vb[1]} ${vb[2]} ${vb[3]}`);
+                return svgElBuilder;
+            }
             
             const svgEl = createSVG('svg')
-            .style('width', svgWidth)
-            .style('height', svgHeight)
-            .attr('viewBox', `${viewBox[0]} ${viewBox[1]} ${viewBox[2]} ${viewBox[3]}`)
             .attr('zoom', 1);
+            setSvgSizes(svgEl, svgWidth, svgHeight, {left: 0, right: 0, top: 2, bottom: 2});
 
             // Y axis
             const yAxisG =  createSVG('g')
@@ -209,8 +219,11 @@
             svgEl.appendTo(el);
 
             const miniMapHeight = 30;
-            const miniMapBlockEl = createEl('div').appendTo(el);
-            const miniMapEl = createSVG('svg').attr('width', state.sizes.width).attr('height', miniMapHeight).appendTo(miniMapBlockEl);
+            const miniMapBlockEl = createEl('div').addClass('chart-range-selector').appendTo(el);
+            const miniMapEl = createSVG('svg').appendTo(miniMapBlockEl);
+            
+            setSvgSizes(miniMapEl, state.sizes.width, miniMapHeight, {left: 0, right: 0, top: 2, bottom: 2});
+
             const miniCVP = new ChartViewPort({ 
                 containerEl: miniMapEl.el, 
                 chartData: chartData, 
@@ -220,6 +233,9 @@
             miniCVP.init();
             state.miniCVP = miniCVP;
             miniCVP.updateRange({from: 0, to: 100}, true)
+
+            const rangeSelector = new RangeSelector({range: {from: 50, to: 75}, containerEl: miniMapBlockEl.el});
+            rangeSelector.init();
 
             // create svg, create lines
 
@@ -612,6 +628,136 @@
             }     
         }        
 
+    }
+
+    function dnd(e, ondnd, data) {
+        const startEvent = e;
+        const fireDndEvent = (mme, last) => {
+            const delta = {
+                x: mme.clientX - startEvent.clientX,
+                y: mme.clientY - startEvent.clientY
+            };
+            const dndEvent = {
+                mme: mme,
+                delta: delta,
+                data: data,
+                finished: last
+            };
+            ondnd(dndEvent);
+        }
+        const onMouseMove = (mme) => {
+            if(finished) return;
+            fireDndEvent(mme, false);
+        };
+        const onMouseUp = (mme) => {
+            if(finished) return;
+            fireDndEvent(mme, true);
+            finish();
+        };
+        let finished = false;
+        const finish = () => {
+            finished = true;
+            document.removeEventListener('mousemove', onMouseMove);
+            document.removeEventListener('mouseup', onMouseUp);
+        };
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+    }
+
+    function limit(v, min, max) {
+        if(v > max) return max;
+        if(v < min) return min;
+        return v;
+    }
+
+    class RangeSelector {
+        constructor(options) {
+            this.range = options.range || {from:0,  to: 100};
+            this.width = options.width;
+            this.minRamgeWidth = options.minRamgeWidth || 5;
+            this.el = new ElementBuilder(options.containerEl);
+            this.onRangeChanged = () => {};
+        }
+
+        init() {
+            this.leftCurtainEl = createEl('div').addClass('left-curtain').appendTo(this.el);
+            this.rightCurtainEl = createEl('div').addClass('right-curtain').appendTo(this.el);
+            this.leftGripperEl = createEl('div').addClass('left-gripper').appendTo(this.el);
+            this.rightGripperEl = createEl('div').addClass('right-gripper').appendTo(this.el);
+            this.sliderEl = createEl('div').addClass('slider').appendTo(this.el);
+
+            // use pointer events???
+
+            this.sliderEl.on('mousedown', (e) => this.onSliderMouseDown(e));
+            this.leftGripperEl.on('mousedown', (e) => this.onLeftGripperMouseDown(e));
+            this.rightGripperEl.on('mousedown', (e) => this.onRightGripperMouseDown(e));
+            this.positionByRange();
+        }
+        positionByRange() {
+            const w = this.el.el.getBoundingClientRect().width;
+            const leftPos = Math.round(w * this.range.from / 100);
+            const rightPos = Math.round(w * (this.range.to) / 100);
+            this.state = {leftPos, rightPos, w};
+            this.updateElementsByState();
+        }
+        updateElementsByState() {
+            const leftPos = this.state.leftPos;
+            const rightPos = this.state.rightPos;
+            const w = this.state.w;
+            const width = rightPos - leftPos;
+            
+            this.sliderEl.style('left', leftPos + 'px');
+            this.sliderEl.style('width', width + 'px');
+            this.leftGripperEl.style('left', leftPos + 'px');
+            this.rightGripperEl.style('right', (w - rightPos) + 'px');
+            this.leftCurtainEl.style('width', leftPos + 'px');
+            this.rightCurtainEl.style('width', (w - rightPos) + 'px');
+        }        
+        getWidth() {
+            return this.el.el.getBoundingClientRect().width;
+        }
+        cloneState() {
+            return {leftPos: this.state.leftPos, rightPos: this.state.rightPos, w: this.state.w};
+        }        
+        onSliderMouseDown(e) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const w = this.getWidth();
+            const startState = this.cloneState();
+            const minWidth = this.minRamgeWidth / 100 * w;
+            const sliderWidth = Math.max(startState.rightPos - startState.leftPos, minWidth);
+            dnd(e, (dndEvent) => {
+                
+                const leftPos = limit(startState.leftPos + dndEvent.delta.x, 0, w - sliderWidth);
+                const rightPos = leftPos + sliderWidth;
+                this.state = {...this.state, leftPos, rightPos};
+                this.updateElementsByState();
+            });
+        }
+        onLeftGripperMouseDown(e) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const w = this.getWidth();
+            const startState = this.cloneState();
+            const minWidth = this.minRamgeWidth / 100 * w;
+            dnd(e, (dndEvent) => {
+                const leftPos = limit(startState.leftPos + dndEvent.delta.x, 0, startState.rightPos - minWidth);
+                this.state = {...this.state, leftPos};
+                this.updateElementsByState();
+            });
+        }
+        onRightGripperMouseDown(e) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            const w = this.getWidth();
+            const startState = this.cloneState();
+            const minWidth = this.minRamgeWidth / 100 * w;
+            dnd(e, (dndEvent) => {
+                const rightPos = limit(startState.rightPos + dndEvent.delta.x, startState.leftPos + minWidth, w);
+                this.state = {...this.state, rightPos};
+                this.updateElementsByState();
+            });
+        }        
     }
 
     class ToggleGroup {
