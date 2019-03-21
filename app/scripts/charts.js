@@ -34,6 +34,8 @@
         return pmul([0,y], m)[1];
     }    
 
+    const maxSlice = (a, from, to) => Math.max(...a.slice(from, to + 1));
+
     const a2m = (m) => {
         return 'matrix(' + m[0] + ',' + m[1] + ',' + m[2] + ',' + m[3] + ',' + m[4] + ',' + m[5] + ')'
     }    
@@ -105,7 +107,7 @@
         const {el, chartData} = options;
         let {sizes} = options;
         sizes = sizes || {width: 500, height: 250};
-        const {colors, columns, names, types} = chartData;
+        const {columns, names, types} = chartData;
         const chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
         const columnsMap = {};
         for(let c of columns) {
@@ -139,18 +141,11 @@
                 to: (xColumn.length - 1) * s.visibleRange.to / 100
             };
             
-            let yMax = Math.max(...visibleLines.map(l => Math.max(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
-            //let yMin = Math.min(...visibleLines.map(l => Math.min(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
+            let yMax = Math.max(...visibleLines.map(l => maxSlice(l, visibleIndexRange.from, visibleIndexRange.to + 1)));
             
             const xSize = (xColumn.length - 2) * xStep;
             const xMin = xSize * s.visibleRange.from / 100;
             const xMax = xSize * s.visibleRange.to / 100;
-
-            // if(ty) {
-            //     const yMaxOld = yMax;
-            //     yMax = translateY(yMin);
-            //     yMin = translateY(yMaxOld);
-            // }
 
             return [xMin, xMax, 0 /*yMin*/, yMax];
         };
@@ -179,21 +174,14 @@
             .attr('viewBox', `${viewBox[0]} ${viewBox[1]} ${viewBox[2]} ${viewBox[3]}`)
             .attr('zoom', 1);
 
-            const bounds = fullBounds;
-            const vm = vMatrix(bounds);
-            const hm = hMatrix(bounds);
-            
+
             // Y axis
             const yAxisG =  createSVG('g')
             .addClass('animate-transform')
             .style('vector-effect', 'non-scaling-stroke')
             .appendTo(svgEl);
             state.elements.hGridLinesG = yAxisG;
-
-            const yAxis = new YAxis({containerEl: yAxisG.el});
-            yAxis.updateRange(fullBounds, state, vm);
-            state.yAxis = yAxis;
-            
+         
             //X axis
             const xAxisG =  createSVG('g')
             .addClass('animate-transform')
@@ -201,20 +189,99 @@
             .attr('transform', 'translate(0, ' + (state.sizes.height + xAxisHeight * 0.8 ) + ')');
             state.elements.xAxisG = xAxisG;            
 
-            const xAxis = new XAxis({containerEl: xAxisG.el, xColumn: xColumn});
-            xAxis.updateRange(fullBounds, state, hm);
-            state.xAxis = xAxis;
+            const cvp = new ChartViewPort({ containerEl: svgEl.el, chartData: chartData, sizes: state.sizes });
+            cvp.init();
+            state.cvp = cvp;
+            
 
+            const xAxis = new XAxis({containerEl: xAxisG.el, xColumn: xColumn});
+            state.xAxis = xAxis;            
+
+            const yAxis = new YAxis({containerEl: yAxisG.el});
+            state.yAxis = yAxis;
+
+            cvp.onChangeTransformations = (({bounds, vm, hm}) => {
+                xAxis.updateRange(bounds, state, hm);
+                yAxis.updateRange(bounds, state, vm);
+            });
+            cvp.updateRange({from: 0, to: 100}, true);
+            
+            svgEl.appendTo(el);
+
+            const sliderEl = createEl('input')
+            .attr('type', 'range')
+            .attr('min', '0')
+            .attr('max', '100')
+            .attr('step', '0.1')
+            .attr('value', '100')
+            .style('width', '100%').el;
+            
+            const onSliderChange = (e) => {
+                const val = Math.max(e.target.value, 3);
+                // 0 <= val <= 100
+                cvp.updateRange({from: 0, to: val});
+            };
+            sliderEl.onchange = onSliderChange;
+            sliderEl.oninput = onSliderChange;
+
+            el.appendChild(sliderEl);
+
+            const toggleGroupEl = createEl('div').appendTo(el);
+            const tg = new ToggleGroup({containerEl: toggleGroupEl.el, names});
+            tg.onToogle = (lId) => toggleLine(lId);
+        }
+       
+        const toggleLine = (lId) => {
+            state.cvp.toggleLine(lId);
+        }
+
+        // const beautyfyBounds = (bounds) => {
+        //     // find nearest netural number divided to six OR 10, 50, 100
+        //     return bounds;
+        // }
+
+        init();
+    }
+
+    class ChartViewPort {
+        constructor(options) {
+            this.el = new ElementBuilder(options.containerEl);
+            this.chartData = options.chartData;
+            this.sizes = options.sizes;
+            this.stroke = options.stroke || 1;
+            this.disabled = {};
+            this.visibleRange = {from: 0, to: 100};
+
+            if(!this.sizes) throw new 'Expected options.sizes';
+
+            this.onChangeTransformations = ()=> {};
+        }
+
+        init() {
+
+            const {colors, columns, types} = this.chartData;
+            const columnsMap = this.columnsMap = {};
+            for(let c of columns) {
+                columnsMap[c[0]] = c;
+            }
+            this.chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
             const columnIds = Object.keys(types);
+            this.xColumnId = Object.keys(types).find(t => types[t] === 'x');
+            this.xColumn = columnsMap[this.xColumnId];
+            this.fullBounds = this.getBounds({from:0, to: 100});
+
             const lineElements = {};
             const linesGC = createSVG('g')
             .addClass('animate-transform')
-            .attr('transform', a2m(vm))
-            .appendTo(svgEl);
+            //.attr('transform', a2m(vm))
+            .appendTo(this.el);
             const linesG = createSVG('g')
-            .attr('transform', a2m(hm))
+            //.attr('transform', a2m(hm))
             .appendTo(linesGC);
 
+            const [,, yMin, yMax] = this.fullBounds;
+            const transformY = (y) => -(y - yMin) + yMax /* -yMin  */;
+            
             for (let columnIndex = 0; columnIndex< columnIds.length; columnIndex++) {
                 const lId = columnIds[columnIndex], 
                     t = types[lId],
@@ -227,7 +294,7 @@
                         d += (pIdx == 1 ? 'M' : 'L');
                         d += (pIdx - 1) * xStep;
                         d += ' ';
-                        d += state.transformY(c[pIdx]);
+                        d += transformY(c[pIdx]);
                     }
                     const p =createSVG('path')
                     .attr('d', d)
@@ -242,94 +309,76 @@
                 } 
             }
 
-            state.elements.linesElements = lineElements;
-            state.elements.linesGC = linesGC;
-            state.elements.linesG = linesG;
-
-            svgEl.appendTo(el);
-
-            //const sliderEl = document.createElement('div');
-            //sliderEl.classList.add('chart-slider');
-
-            const sliderEl = createEl('input')
-            .attr('type', 'range')
-            .attr('min', '0')
-            .attr('max', '100')
-            .attr('step', '0.1')
-            .attr('value', '100')
-            .style('width', '100%').el;
-            
-            const onSliderChange = (e) => {
-                const val = Math.max(e.target.value, 3);
-                // 0 <= val <= 100
-                setRange({from: 0, to: val});
-            };
-            sliderEl.onchange = onSliderChange;
-            sliderEl.oninput = onSliderChange;
-
-            el.appendChild(sliderEl);
-
-            const toggleGroupEl = createEl('div').appendTo(el);
-            const tg = new ToggleGroup({containerEl: toggleGroupEl.el, names});
-            tg.onToogle = (lId) => toggleLine(lId);
-
-            
+            this.linesElements = lineElements;
+            this.linesGC = linesGC;
+            this.linesG = linesG;
         }
-    
-        const vMatrix = (bounds) => {
-            const fbyMax = state.fullBounds[3];
+
+        vMatrix(bounds) {
+            const fbyMax = this.fullBounds[3];
             const yMax = bounds[3];
-            let yScale = state.sizes.height / yMax;
+            let yScale = this.sizes.height / yMax;
             const m1 = [1,0,0,1,0, yMax * yScale], m2 = [1,0,0, yScale,0,0], m3 =[1,0,0,1,0,-fbyMax];
             const vt = mmul(m1, mmul(m2, m3));
             return vt;
         }
-
-        const hMatrix = (bounds) => {
+        
+        hMatrix(bounds) {
             const [xMin, xMax,] = bounds;
-            let xScale = state.sizes.width / xMax;
+            let xScale = this.sizes.width / xMax;
             const dx = -xMin /*, dy = 0 /*-yMin*/;
             const m = mmul([1,0,0,1,dx,0], [xScale,0,0,1,0,0]);
             return m;
         }
 
-        
-        const toggleLine = (lId) => {
-            state.disabled[lId] = !state.disabled[lId];
-            const lEl = state.elements.linesElements[lId];
-            if(state.disabled[lId]) {
+        getBounds(range) {
+            range = range || { from: 0, to: 100};
+            const visibleLines = this.chartColumnsIds.filter(lid => !this.disabled[lid]).map(lid => this.columnsMap[lid]);
+
+            const visibleIndexRange = {
+                from: 1 + (this.xColumn.length - 1) * this.visibleRange.from / 100,
+                to: (this.xColumn.length - 1) * this.visibleRange.to / 100
+            };
+            
+            let yMax = Math.max(...visibleLines.map(l => maxSlice(l, visibleIndexRange.from, visibleIndexRange.to + 1)));
+            //let yMin = Math.min(...visibleLines.map(l => Math.min(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
+            
+            const xSize = (this.xColumn.length - 2) * xStep;
+            const xMin = xSize * range.from / 100;
+            const xMax = xSize * range.to / 100;
+
+            return [xMin, xMax, 0 /*yMin*/, yMax];
+        }
+
+        updateRange(range, force) {
+            
+            range = range || {from: 0, to: 100};
+            
+            if(this.visibleRange.from == range.from && this.visibleRange.to == range.to && !force) return;
+            
+            this.visibleRange = range;
+            
+            const newBounds = this.getBounds(range);
+    
+            const vm = this.vMatrix(newBounds);
+            const hm = this.hMatrix(newBounds);
+    
+            this.linesGC.attr('transform', a2m(vm));
+            this.linesG.attr('transform', a2m(hm));
+
+            this.onChangeTransformations({bounds: newBounds, vm, hm});
+        }
+
+        toggleLine(lId)  {
+            this.disabled[lId] = !this.disabled[lId];
+            const lEl = this.linesElements[lId];
+            if(this.disabled[lId]) {
                 lEl.addClass('disbled-line');
             } else {
                 lEl.removeClass('disbled-line');
             }
-            setRange(state.visibleRange, true);
+            this.updateRange(this.visibleRange, true);
         }
-
-        // const beautyfyBounds = (bounds) => {
-        //     // find nearest netural number divided to six OR 10, 50, 100
-        //     return bounds;
-        // }
-
-        const setRange = (range, force) => {
-            
-            range = range || {from: 0, to: 100};
-            if(state.visibleRange.from == range.from && state.visibleRange.to == range.to && !force) return;
-            
-            state.visibleRange = range;
-            
-            const newBounds = getBounds(state);
-
-            const vm = vMatrix(newBounds);
-            const hm = hMatrix(newBounds);
-
-            state.elements.linesGC.attr('transform', a2m(vm));
-            state.elements.linesG.attr('transform', a2m(hm));
-
-            state.yAxis.updateRange(newBounds, state, vm);
-            state.xAxis.updateRange(newBounds, state, hm);
-        }
-
-        init();
     }
 
     class XAxis {
@@ -486,7 +535,6 @@
                 let yPoint = (yMax - yMin) / (lc + 1) * i;
                 yPoint = this.prettyY(yPoint);
                 const y = pmulY(this.transformY(yPoint), vm);
-                
                 lines.push({y: y, yGraph: yPoint, text: yPoint});
             }
             
