@@ -265,7 +265,8 @@
             state.miniCVP = miniCVP;
             miniCVP.updateRange(initialRange, true)
 
-            const rangeSelector = new RangeSelector({range: initialRange, containerEl: miniMapBlockEl.el});
+            const minRangeWidth =  Math.max(2 / (xColumn.length - 1) * 100, (1 / state.sizes.width) * 100, 5);
+            const rangeSelector = new RangeSelector({range: initialRange, containerEl: miniMapBlockEl.el, minRangeWidth: minRangeWidth});
             rangeSelector.init();
             rangeSelector.onRangeChanged = (r) => { cph.hide(); cvp.updateRange(r); };
 
@@ -778,7 +779,7 @@
         constructor(options) {
             this.range = options.range || {from:0,  to: 100};
             this.width = options.width;
-            this.minRamgeWidth = options.minRamgeWidth || 5;
+            this.minRangeWidth = options.minRangeWidth || 5;
             this.el = new ElementBuilder(options.containerEl);
             this.onRangeChanged = () => {};
         }
@@ -835,7 +836,7 @@
             event.stopImmediatePropagation();
             const w = this.getWidth();
             const startState = this.cloneState();
-            const minWidth = this.minRamgeWidth / 100 * w;
+            const minWidth = this.minRangeWidth / 100 * w;
             const sliderWidth = Math.max(startState.rightPos - startState.leftPos, minWidth);
             dnd(e, (dndEvent) => {
                 const leftPos = limit(startState.leftPos + dndEvent.delta.x, 0, w - sliderWidth);
@@ -850,7 +851,7 @@
             event.stopImmediatePropagation();
             const w = this.getWidth();
             const startState = this.cloneState();
-            const minWidth = this.minRamgeWidth / 100 * w;
+            const minWidth = this.minRangeWidth / 100 * w;
             dnd(e, (dndEvent) => {
                 const leftPos = limit(startState.leftPos + dndEvent.delta.x, 0, startState.rightPos - minWidth);
                 this.state = {...this.state, leftPos};
@@ -863,7 +864,7 @@
             event.stopImmediatePropagation();
             const w = this.getWidth();
             const startState = this.cloneState();
-            const minWidth = this.minRamgeWidth / 100 * w;
+            const minWidth = this.minRangeWidth / 100 * w;
             dnd(e, (dndEvent) => {
                 const rightPos = limit(startState.rightPos + dndEvent.delta.x, startState.leftPos + minWidth, w);
                 this.state = {...this.state, rightPos};
