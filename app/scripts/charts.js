@@ -249,6 +249,8 @@
             const toggleGroupEl = createEl('div').appendTo(el);
             const tg = new ToggleGroup({containerEl: toggleGroupEl.el, names});
             tg.onToogle = (lId) => toggleLine(lId);
+
+            el['__chart_state__'] = state;
         }
        
         const toggleLine = (lId) => {
@@ -357,8 +359,8 @@
             const visibleLines = this.chartColumnsIds.filter(lid => !this.disabled[lid]).map(lid => this.columnsMap[lid]);
 
             const visibleIndexRange = {
-                from: 1 + (this.xColumn.length - 1) * this.visibleRange.from / 100,
-                to: (this.xColumn.length - 1) * this.visibleRange.to / 100
+                from: 1 + (this.xColumn.length - 1) * range.from / 100,
+                to: (this.xColumn.length - 1) * range.to / 100
             };
             
             let yMax = Math.max(...visibleLines.map(l => maxSlice(l, visibleIndexRange.from, visibleIndexRange.to + 1)));
@@ -388,6 +390,7 @@
             this.linesG.attr('transform', a2m(hm));
 
             this.onChangeTransformations({bounds: newBounds, vm, hm});
+            this.currentTransformations = {bounds: newBounds, vm, hm};
         }
 
         toggleLine(lId)  {
