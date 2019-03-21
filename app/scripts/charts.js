@@ -19,6 +19,18 @@
         ];
     }
 
+    const minverse = (m) => {
+        let d = m[0] * m[3] - m[1] * m[2];
+        return {
+          0: m[3] / d,
+          1: m[1] / -d,
+          2: m[2] / -d,
+          3: m[0] / d,
+          4: (m[3] * m[4] - m[2] * m[5]) / -d,
+          5: (m[1] * m[4] - m[0] * m[5]) / d
+        };
+    } 
+
     const pmul = (p, m) => {
         return [
             m[0] * p[0] + m[2] * p[1] + m[4],
@@ -109,10 +121,10 @@
     const xStep = 20;
    
     function createChart(options) {
-        const {el, chartData} = options;
+        const {el, chartData, title} = options;
         let {sizes} = options;
         sizes = sizes || {width: 500, height: 250};
-        const {columns, names, types} = chartData;
+        const {columns, names, types, colors} = chartData;
         const chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
         const columnsMap = {};
         for(let c of columns) {
@@ -180,6 +192,10 @@
                 .attr('viewBox', `${vb[0]} ${vb[1]} ${vb[2]} ${vb[3]}`);
                 return svgElBuilder;
             }
+
+            if(title) {
+                createEl('div').addClass('title').innerText(title).appendTo(el);
+            }
             
             const svgEl = createSVG('svg')
             .attr('zoom', 1);
@@ -210,6 +226,13 @@
             cvp.init();
             state.cvp = cvp;
             
+            this.viewPortEl = new ElementBuilder(options.viewPortEl);
+            this.viewPort = options.viewPort;
+
+            const cph = new ChartPositionHighlighter({viewPortEl: cvp.linesGC.el, hoverContainerEl: cvp.hoverContainerG.el, viewPort: cvp});
+            cph.init();
+            state.cph = cph;            
+
 
             const xAxis = new XAxis({containerEl: xAxisG.el, xColumn: xColumn});
             state.xAxis = xAxis;            
@@ -222,7 +245,7 @@
                 yAxis.updateRange(bounds, state, vm);
             });
             cvp.updateRange(initialRange, true);
-            
+           
             svgEl.appendTo(el);
 
             const miniMapHeight = 30;
@@ -244,7 +267,7 @@
 
             const rangeSelector = new RangeSelector({range: initialRange, containerEl: miniMapBlockEl.el});
             rangeSelector.init();
-            rangeSelector.onRangeChanged = (r) => cvp.updateRange(r);
+            rangeSelector.onRangeChanged = (r) => { cph.hide(); cvp.updateRange(r); };
 
             const toggleGroupEl = createEl('div').appendTo(el);
             const tg = new ToggleGroup({containerEl: toggleGroupEl.el, names});
@@ -284,8 +307,10 @@
 
             const {colors, columns, types} = this.chartData;
             const columnsMap = this.columnsMap = {};
+            const colorsMap = this.colorsMap = {};
             for(let c of columns) {
                 columnsMap[c[0]] = c;
+                colorsMap[c[0]] = colors[c[0]];
             }
             this.chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
             const columnIds = Object.keys(types);
@@ -296,14 +321,17 @@
             const lineElements = {};
             const linesGC = createSVG('g')
             .addClass('animate-transform')
-            //.attr('transform', a2m(vm))
             .appendTo(this.el);
             const linesG = createSVG('g')
-            //.attr('transform', a2m(hm))
             .appendTo(linesGC);
+
+            const hoverContainerG = createSVG('g')
+            .appendTo(this.el);
+            this.hoverContainerG = hoverContainerG;
 
             const [,, yMin, yMax] = this.fullBounds;
             const transformY = (y) => -(y - yMin) + yMax /* -yMin  */;
+            this.transformY = transformY;
             
             for (let columnIndex = 0; columnIndex< columnIds.length; columnIndex++) {
                 const lId = columnIds[columnIndex], 
@@ -354,9 +382,17 @@
             return m;
         }
 
+        getVisibleLinesIds() {
+            return this.chartColumnsIds.filter(lid => !this.disabled[lid]);
+        }
+
+        getVisibleLines() {
+            return this.getVisibleLinesIds().map(lid => this.columnsMap[lid]);
+        }
+
         getBounds(range) {
             range = range || { from: 0, to: 100};
-            const visibleLines = this.chartColumnsIds.filter(lid => !this.disabled[lid]).map(lid => this.columnsMap[lid]);
+            const visibleLines = this.getVisibleLines();
 
             const visibleIndexRange = {
                 from: 1 + (this.xColumn.length - 1) * range.from / 100,
@@ -402,6 +438,82 @@
                 lEl.removeClass('disbled-line');
             }
             this.updateRange(this.visibleRange, true);
+        }
+    }
+
+    class ChartPositionHighlighter {
+        constructor(options) {
+            this.viewPortEl = new ElementBuilder(options.viewPortEl);
+            this.hoverContainerEl = new ElementBuilder(options.hoverContainerEl);
+            this.viewPort = options.viewPort;
+            this.circleElementsMap = {};
+            this.circleElements = [];
+        }
+
+        init() {
+            //this.viewPortEl.on('pointerclick', (e)=> {this.onViewPortClick(e)});
+            //this.viewPortEl.on('click', (e )=> {this.onViewPortClick(e)});
+            this.viewPortEl.style('pointer-events', 'bounding-box');
+            this.viewPortEl.el.onclick = (e )=> {this.onViewPortClick(e)};
+        }
+
+        hide() {
+            for(let i =0; i < this.circleElements.length; i++) {
+                this.circleElements[i].attr('display', 'none');
+            }
+        }
+
+        onViewPortClick(e) {
+            const hm = this.viewPort.currentTransformations.hm;
+            const vm = this.viewPort.currentTransformations.vm;
+
+            const ihm = minverse(hm);
+            const translatedPoint = pmul([e.offsetX, e.offsetY], ihm);
+            const tx = translatedPoint[0];
+            const pIdx = Math.round(tx / xStep) + 1;
+            const xPoint = (pIdx - 1) * xStep;
+            const xValue = this.viewPort.xColumn[pIdx];
+            const xDate = new Date(xValue);
+
+            if(Object.keys(this.circleElementsMap).length == 0) {
+                for(let i = 0; i < this.viewPort.chartColumnsIds.length; i++) {
+                    const lId = this.viewPort.chartColumnsIds[i];
+                    const c = createSVG('circle')
+                    .attr('display', 'none')
+                    .attr('stroke', this.viewPort.colorsMap[lId])
+                    .attr('cx', '0')
+                    .attr('cy', '0')
+                    .attr('r', '3')
+                    .addClass('chart-hover-circle')
+                    .appendTo(this.hoverContainerEl);
+                    this.circleElementsMap[lId] = c;
+                    this.circleElements.push(c)
+                }
+            }
+            
+            const visibleLines = this.viewPort.getVisibleLinesIds();
+            for(let i = 0; i < visibleLines.length; i++) {
+                const lId = visibleLines[i];
+                const circleEl = this.circleElementsMap[lId];
+                const y = this.viewPort.columnsMap[lId][pIdx];
+                const yPoint = this.viewPort.transformY(y);
+                const translatedPoint = pmul([xPoint, yPoint] ,mmul(vm, hm));
+                circleEl.attr('cx', translatedPoint[0]);
+                circleEl.attr('cy', translatedPoint[1]);
+                this.circleElements[i].attr('display', '');
+            }
+
+            // create circles
+
+            // create line
+
+
+            // create info box
+
+            // align info box
+
+            // todo take  attention to viewport  paddings
+
         }
     }
 

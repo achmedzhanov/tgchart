@@ -2,6 +2,10 @@ body.day {
     background-color:  #ffffff;
 }
 
+body.hight {
+    background-color:  #242f3e;
+}
+
 .chart-container svg text{
     -webkit-user-select: none;
     -moz-user-select: none;
@@ -9,10 +13,26 @@ body.day {
     user-select: none;
  }
 
+ .chart-container .title {
+     font-size: 20px;
+     font-weight: bold;
+     margin-top: 1rem;
+     margin-bottom: 1rem;
+ }
+
 .chart-slider {
     height: 20px;
     width: 100%;
     position: relative;
+}
+
+.chart-hover-circle {
+    fill: #ffffff;
+    stroke-width: 2px;
+}
+
+.hight .chart-hover-circle {
+    fill: #242f3e;
 }
 
 .animate-transform {
