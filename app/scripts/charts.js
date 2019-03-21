@@ -48,7 +48,7 @@
         } else {
           return navigator.userLanguage || navigator.language || navigator.browserLanguage || 'en';
         }
-      }
+    }
 
     class ElementBuilder {
         constructor(el) {
@@ -199,7 +199,14 @@
             .attr('transform', 'translate(0, ' + (state.sizes.height + xAxisHeight * 0.8 ) + ')');
             state.elements.xAxisG = xAxisG;            
 
-            const cvp = new ChartViewPort({ containerEl: svgEl.el, chartData: chartData, sizes: state.sizes });
+            const initialRange = {from: 50, to: 75};
+
+            const cvp = new ChartViewPort({ 
+                containerEl: svgEl.el, 
+                chartData: chartData, 
+                sizes: state.sizes,
+                range: initialRange
+            });
             cvp.init();
             state.cvp = cvp;
             
@@ -214,7 +221,7 @@
                 xAxis.updateRange(bounds, state, hm);
                 yAxis.updateRange(bounds, state, vm);
             });
-            cvp.updateRange({from: 0, to: 100}, true);
+            cvp.updateRange(initialRange, true);
             
             svgEl.appendTo(el);
 
@@ -228,34 +235,16 @@
                 containerEl: miniMapEl.el, 
                 chartData: chartData, 
                 sizes: { width: state.sizes.width, height: miniMapHeight},
-                strokeWidth: '1px'
+                strokeWidth: '1px',
+                range: initialRange
             });
             miniCVP.init();
             state.miniCVP = miniCVP;
-            miniCVP.updateRange({from: 0, to: 100}, true)
+            miniCVP.updateRange(initialRange, true)
 
-            const rangeSelector = new RangeSelector({range: {from: 50, to: 75}, containerEl: miniMapBlockEl.el});
+            const rangeSelector = new RangeSelector({range: initialRange, containerEl: miniMapBlockEl.el});
             rangeSelector.init();
-
-            // create svg, create lines
-
-            const sliderEl = createEl('input')
-            .attr('type', 'range')
-            .attr('min', '0')
-            .attr('max', '100')
-            .attr('step', '0.1')
-            .attr('value', '100')
-            .style('width', '100%').el;
-            
-            const onSliderChange = (e) => {
-                const val = Math.max(e.target.value, 3);
-                // 0 <= val <= 100
-                cvp.updateRange({from: 0, to: val});
-            };
-            sliderEl.onchange = onSliderChange;
-            sliderEl.oninput = onSliderChange;
-
-            el.appendChild(sliderEl);
+            rangeSelector.onRangeChanged = (r) => cvp.updateRange(r);
 
             const toggleGroupEl = createEl('div').appendTo(el);
             const tg = new ToggleGroup({containerEl: toggleGroupEl.el, names});
@@ -282,7 +271,7 @@
             this.sizes = options.sizes;
             this.strokeWidth = options.strokeWidth || 2;
             this.disabled = {};
-            this.visibleRange = {from: 0, to: 100};
+            this.visibleRange = options.range || {from: 0, to: 100};
 
             if(!this.sizes) throw new 'Expected options.sizes';
 
@@ -357,9 +346,9 @@
         
         hMatrix(bounds) {
             const [xMin, xMax,] = bounds;
-            let xScale = this.sizes.width / xMax;
-            const dx = -xMin /*, dy = 0 /*-yMin*/;
-            const m = mmul([1,0,0,1,dx,0], [xScale,0,0,1,0,0]);
+            let xScale = this.sizes.width / (xMax - xMin);
+            const m2 = [xScale,0,0,1,0,0], m3 = [1,0,0,1, -xMin,0];
+            const m = mmul(m2, m3);
             return m;
         }
 
@@ -678,7 +667,6 @@
             this.el = new ElementBuilder(options.containerEl);
             this.onRangeChanged = () => {};
         }
-
         init() {
             this.leftCurtainEl = createEl('div').addClass('left-curtain').appendTo(this.el);
             this.rightCurtainEl = createEl('div').addClass('right-curtain').appendTo(this.el);
@@ -693,8 +681,15 @@
             this.rightGripperEl.on('pointerdown', (e) => this.onRightGripperMouseDown(e));
             this.positionByRange();
         }
+        raiseRangeChange() {
+            this.range;
+            const w = this.getWidth();
+            const from = this.state.leftPos / w * 100;
+            const to = this.state.rightPos / w * 100;
+            this.onRangeChanged({from, to});
+        }
         positionByRange() {
-            const w = this.el.el.getBoundingClientRect().width;
+            const w = this.getWidth();
             const leftPos = Math.round(w * this.range.from / 100);
             const rightPos = Math.round(w * (this.range.to) / 100);
             this.state = {leftPos, rightPos, w};
@@ -714,6 +709,7 @@
             this.rightCurtainEl.style('width', (w - rightPos) + 'px');
         }        
         getWidth() {
+            if(this.width) return this.width;
             return this.el.el.getBoundingClientRect().width;
         }
         cloneState() {
@@ -731,6 +727,7 @@
                 const rightPos = leftPos + sliderWidth;
                 this.state = {...this.state, leftPos, rightPos};
                 this.updateElementsByState();
+                this.raiseRangeChange();
             });
         }
         onLeftGripperMouseDown(e) {
@@ -743,6 +740,7 @@
                 const leftPos = limit(startState.leftPos + dndEvent.delta.x, 0, startState.rightPos - minWidth);
                 this.state = {...this.state, leftPos};
                 this.updateElementsByState();
+                this.raiseRangeChange();
             });
         }
         onRightGripperMouseDown(e) {
@@ -755,6 +753,7 @@
                 const rightPos = limit(startState.rightPos + dndEvent.delta.x, startState.leftPos + minWidth, w);
                 this.state = {...this.state, rightPos};
                 this.updateElementsByState();
+                this.raiseRangeChange();
             });
         }        
     }
