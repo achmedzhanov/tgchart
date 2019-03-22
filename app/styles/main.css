@@ -30,7 +30,7 @@ body {
 
 .chart-container {
   margin: 20px auto 0 auto;
-  width: 500px;
+  width: 80%;
   /*height: 250px;*/
   background-color: white;
 }

@@ -124,7 +124,7 @@
         const {el, chartData, title} = options;
         let {sizes} = options;
         sizes = sizes || {width: 500, height: 250};
-        const {columns, names, types, colors} = chartData;
+        const {columns, names, types} = chartData;
         const chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
         const columnsMap = {};
         for(let c of columns) {
@@ -174,12 +174,16 @@
             state.fullBounds = fullBounds;
             const [, , yMin, yMax] = fullBounds;
 
+            // TODO_use_name_viewPortSize
+
             state.sizes = sizes;
             
             const xAxisHeight = 20;
             const svgWidth = sizes.width;
             const svgHeight = sizes.height + xAxisHeight;
-            
+            const viewPortWidth = sizes.width;
+            const viewPortHeight = sizes.height;
+
             state.transformY = (y) => -(y - yMin) + yMax /* -yMin  */;    
             // see method vertMatrix
             //TODO use same matrices for chart view port and axes!
@@ -197,9 +201,19 @@
                 createEl('div').addClass('title').innerText(title).appendTo(el);
             }
             
+            const viewPortPaddings = {left: 0, right: 0, top: 2, bottom: 2};
+
+            const svgElC = createEl('div').style('position', 'relative').appendTo(el);
+            const viewPortBackdropEl = createEl('div')
+            .style('left', viewPortPaddings.left + 'px')
+            .style('top', viewPortPaddings.top + 'px')
+            .style('width', viewPortWidth + 'px')
+            .style('height', viewPortHeight + 'px')
+            .style('position', 'absolute').appendTo(svgElC);
+
             const svgEl = createSVG('svg')
             .attr('zoom', 1);
-            setSvgSizes(svgEl, svgWidth, svgHeight, {left: 0, right: 0, top: 2, bottom: 2});
+            setSvgSizes(svgEl, svgWidth, svgHeight, viewPortPaddings);
 
             // Y axis
             const yAxisG =  createSVG('g')
@@ -229,7 +243,8 @@
             this.viewPortEl = new ElementBuilder(options.viewPortEl);
             this.viewPort = options.viewPort;
 
-            const cph = new ChartsTooltip({viewPortEl: cvp.linesGC.el, hoverContainerEl: cvp.hoverContainerG.el, viewPort: cvp, sizes: state.sizes});
+            const cph = new ChartsTooltip({viewPortEl: cvp.linesGC.el, hoverContainerEl: cvp.hoverContainerG.el, 
+                viewPort: cvp, viewPortBackdropEl: viewPortBackdropEl.el, sizes: state.sizes});
             cph.init();
             state.cph = cph;            
 
@@ -246,7 +261,7 @@
             });
             cvp.updateRange(initialRange, true);
            
-            svgEl.appendTo(el);
+            svgEl.appendTo(svgElC);
 
             const miniMapHeight = 30;
             const miniMapBlockEl = createEl('div').addClass('chart-range-selector').appendTo(el);
@@ -306,7 +321,7 @@
 
         init() {
 
-            const {colors, columns, types} = this.chartData;
+            const {colors, columns, types, names} = this.chartData;
             const columnsMap = this.columnsMap = {};
             const colorsMap = this.colorsMap = {};
             for(let c of columns) {
@@ -318,7 +333,7 @@
             this.xColumnId = Object.keys(types).find(t => types[t] === 'x');
             this.xColumn = columnsMap[this.xColumnId];
             this.fullBounds = this.getBounds({from:0, to: 100});
-
+            this.names = names;
             const lineElements = {};
             const linesGC = createSVG('g')
             .addClass('animate-transform')
@@ -383,17 +398,21 @@
             return m;
         }
 
-        getVisibleLinesIds() {
+        getEnabledLinesIds() {
             return this.chartColumnsIds.filter(lid => !this.disabled[lid]);
         }
 
-        getVisibleLines() {
-            return this.getVisibleLinesIds().map(lid => this.columnsMap[lid]);
+        getDisabledLinesIds() {
+            return this.chartColumnsIds.filter(lid => this.disabled[lid]);
+        }
+
+        getEnabledLines() {
+            return this.getEnabledLinesIds().map(lid => this.columnsMap[lid]);
         }
 
         getBounds(range) {
             range = range || { from: 0, to: 100};
-            const visibleLines = this.getVisibleLines();
+            const visibleLines = this.getEnabledLines();
 
             const visibleIndexRange = {
                 from: 1 + (this.xColumn.length - 1) * range.from / 100,
@@ -446,6 +465,7 @@
         constructor(options) {
             this.viewPortEl = new ElementBuilder(options.viewPortEl);
             this.hoverContainerEl = new ElementBuilder(options.hoverContainerEl);
+            this.viewPortBackdropEl = new ElementBuilder(options.viewPortBackdropEl);
             this.viewPort = options.viewPort;
             this.sizes = options.sizes;
             this.isCreatedElements = false;
@@ -454,19 +474,38 @@
         }
 
         init() {
-            this.viewPortEl.style('pointer-events', 'bounding-box');
-            this.viewPortEl.el.onclick = (e )=> {this.onViewPortClick(e)};
+            //this.viewPortEl.style('pointer-events', 'bounding-box');
+            //this.viewPortEl.el.onclick = (e )=> {this.onViewPortClick(e)};
+            this.viewPortBackdropEl.on('click', (e )=> {this.onViewPortClick(e)});
         }
 
         hide() {
+            if(!this.opened) return;
+
             for(let i =0; i < this.circleElements.length; i++) {
                 this.circleElements[i].attr('display', 'none');
             
             }
-            this.lineEl.style('display', 'none');
-            // this.tooltipEl.style('display', 'none');
+            this.lineEl.attr('display', 'none');
+            this.tooltipEl.style('display', 'none');
+
+            this.opened = false;
         }
         createElements() {
+
+            this.tooltipEl = createEl('div').addClass('chart-tooltip').style('left', '0').style('top', '0').style('display', 'none').appendTo(this.viewPortBackdropEl);
+            this.tooltipDateEl = createEl('div').addClass('chart-tooltip-date').appendTo(this.tooltipEl);
+            this.tooltipValuesContainerEl = createEl('div').addClass('chart-tooltip-values').appendTo(this.tooltipEl);
+            this.tooltipValuesBlocksElMap = {};
+            this.tooltipValuesElMap = {};
+            for(let i = 0; i < this.viewPort.chartColumnsIds.length; i++) {
+                const lId = this.viewPort.chartColumnsIds[i];
+                const vb = createEl('div').addClass('chart-tooltip-value-block').style('color', this.viewPort.colorsMap[lId]).appendTo(this.tooltipValuesContainerEl);
+                this.tooltipValuesBlocksElMap[lId] = vb;
+                this.tooltipValuesElMap[lId] = createEl('div').addClass('chart-tooltip-value').appendTo(vb);
+                createEl('div').addClass('chart-tooltip-name').innerText(this.viewPort.names[lId]).appendTo(vb); 
+            }
+            
 
             this.lineEl = createSVG('path').attr('d', 'M0 0 L0 ' + (this.sizes.height)).attr('display', 'none')
             .addClass('chart-tooltip-line').appendTo(this.hoverContainerEl);
@@ -484,8 +523,6 @@
                 this.circleElementsMap[lId] = c;
                 this.circleElements.push(c)
             }
-
-            //create_div
         }
         onViewPortClick(e) {
 
@@ -493,6 +530,8 @@
                 this.createElements();
                 this.isCreatedElements = true;
             }
+
+            this.opened = true;
 
             const hm = this.viewPort.currentTransformations.hm;
             const vm = this.viewPort.currentTransformations.vm;
@@ -505,11 +544,12 @@
             const xValue = this.viewPort.xColumn[pIdx];
             const xDate = new Date(xValue);
 
-            const visibleLines = this.viewPort.getVisibleLinesIds();
+            const visibleLines = this.viewPort.getEnabledLinesIds();
             const m = mmul(vm, hm);
 
             for(let i = 0; i < visibleLines.length; i++) {
                 const lId = visibleLines[i];
+                
                 const circleEl = this.circleElementsMap[lId];
                 const y = this.viewPort.columnsMap[lId][pIdx];
                 const yPoint = this.viewPort.transformY(y);
@@ -517,17 +557,26 @@
                 circleEl.attr('cx', translatedPoint[0]);
                 circleEl.attr('cy', translatedPoint[1]);
                 this.circleElements[i].attr('display', '');
+
+                this.tooltipValuesElMap[lId].innerText('' + yPoint);
+                this.tooltipValuesBlocksElMap[lId].style('display', 'inline-block')
             }
 
-            this.lineEl.attr('display', '');
+            const disabledIds = this.viewPort.getDisabledLinesIds();
+            for (let lId of disabledIds) {
+                this.tooltipValuesBlocksElMap[lId].style('display', 'none');
+            }
+            const userLang = getNavigatorLanguage();
+            const dateLabel = { weekday: 'short', month: 'short', day: 'numeric' };            
+            this.tooltipDateEl.innerText(xDate.toLocaleDateString(userLang, dateLabel));
+            this.tooltipEl.style('display', 'block');
+            this.tooltipEl.style('left', pmulX(xPoint ,m) - 10 + 'px');
+            this.tooltipEl.style('top', 20 + 'px');
+
+            this.lineEl.attr('display', 'block');
             this.lineEl.attr('transform', 'translate(' + pmulX(xPoint ,m)  + ', 0)')
 
-            // create info box
-
             // align info box
-
-            // todo take  attention to viewport  paddings
-
         }
     }
 

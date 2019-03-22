@@ -14,11 +14,13 @@ onDocumentReady(() => {
     .then((r) => r.json())
     .then((data) => {
         for(let i = 0; i<data.length; i++) {
-            // if(i == 4)
+            const el = document.getElementById('chart' + i);
+            const w = el.offsetWidth || 500;
             window.createChart({
-                el: document.getElementById('chart' + i),
+                el: el,
                 chartData: data[i],
-                title: 'Chart #' + i
+                title: 'Chart #' + i,
+                sizes: {width: w, height: w / 2}
             });
         }
     });

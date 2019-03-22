@@ -26,6 +26,36 @@ body.hight {
     position: relative;
 }
 
+.chart-tooltip {
+    position: absolute;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 0px 5px #dfe6eb;
+    
+    background-color: #ffffff;
+    top: 10px;
+}
+
+.chart-tooltip .chart-tooltip-value-block {
+    display: inline-block;
+    margin-right: 1rem;
+}
+
+.chart-tooltip .chart-tooltip-date {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 8px;
+}
+
+.chart-tooltip .chart-tooltip-value {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.chart-tooltip .chart-tooltip-name {
+    font-size: 10px;
+}
+
 .chart-tooltip-circle {
     fill: #ffffff;
     stroke-width: 2px;
