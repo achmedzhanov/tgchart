@@ -921,8 +921,8 @@
             return {leftPos: this.state.leftPos, rightPos: this.state.rightPos, w: this.state.w};
         }        
         onSliderMouseDown(e) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
+            e.preventDefault();
+            e.stopImmediatePropagation();
             const w = this.getWidth();
             const startState = this.cloneState();
             const minWidth = this.minRangeWidth / 100 * w;
@@ -936,8 +936,8 @@
             });
         }
         onLeftGripperMouseDown(e) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
+            e.preventDefault();
+            e.stopImmediatePropagation();
             const w = this.getWidth();
             const startState = this.cloneState();
             const minWidth = this.minRangeWidth / 100 * w;
@@ -949,8 +949,8 @@
             });
         }
         onRightGripperMouseDown(e) {
-            event.preventDefault();
-            event.stopImmediatePropagation();
+            e.preventDefault();
+            e.stopImmediatePropagation();
             const w = this.getWidth();
             const startState = this.cloneState();
             const minWidth = this.minRangeWidth / 100 * w;
