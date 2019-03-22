@@ -445,6 +445,14 @@
             return [xMin, xMax, 0 /*yMin*/, yMax];
         }
 
+        requestUpdate(u) {
+            if(this.lastUpdate) cancelAnimationFrame();
+            this.lastUpdate = requestAnimationFrame(() => {
+                u();
+                this.lastUpdate = null;
+            });
+        }
+
         updateRange(range, force) {
             
             range = range || {from: 0, to: 100};
@@ -472,6 +480,8 @@
                 const [xMin, xMax,] = newBounds;
                 let xScale = this.sizes.width / (xMax - xMin);
 
+                let updates = [];
+
                 if(needRebuildLines) {
                     const visibleLinesIds = this.getEnabledLinesIds();
                     for (let lId of visibleLinesIds) {
@@ -483,11 +493,14 @@
                             d += ' ';
                             d += pmulY(this.transformY(c[pIdx]), vm);
                         }
-                        this.linesElements[lId].attr('d', d);
+                        updates.push(()=> this.linesElements[lId].attr('d', d));
                     }
                 }
 
-                this.linesG.attr('transform', 'translate(' + -xMin * xScale + ', 0)');
+                updates.push(()=> this.linesG.attr('transform', 'translate(' + -xMin * xScale + ', 0)'));
+                this.requestUpdate(()=> {
+                    for(let u of updates) u();
+                });
             }
 
             this.onChangeTransformations({bounds: newBounds, vm, hm});
