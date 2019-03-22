@@ -264,7 +264,7 @@
             svgEl.appendTo(svgElC);
 
             const miniMapHeight = 30;
-            const miniMapBlockEl = createEl('div').addClass('chart-range-selector').appendTo(el);
+            const miniMapBlockEl = createEl('div').addClass('chart-range-selector').style('width', state.sizes.width + 'px').appendTo(el);
             const miniMapEl = createSVG('svg').appendTo(miniMapBlockEl);
             
             setSvgSizes(miniMapEl, state.sizes.width, miniMapHeight, {left: 0, right: 0, top: 2, bottom: 2});
@@ -287,7 +287,7 @@
 
             const toggleGroupEl = createEl('div').appendTo(el);
             const tg = new ToggleGroup({containerEl: toggleGroupEl.el, names});
-            tg.onToogle = (lId) => toggleLine(lId);
+            tg.onToogle = (lId) => {cph.hide(); toggleLine(lId);}
 
             el['__chart_state__'] = state;
         }
@@ -419,7 +419,9 @@
                 to: (this.xColumn.length - 1) * range.to / 100
             };
             
-            let yMax = Math.max(...visibleLines.map(l => maxSlice(l, visibleIndexRange.from, visibleIndexRange.to + 1)));
+            let yMax = visibleLines.length > 0 ? 
+                Math.max(...visibleLines.map(l => maxSlice(l, visibleIndexRange.from, visibleIndexRange.to + 1))):
+                this.fullBounds[3];
             //let yMin = Math.min(...visibleLines.map(l => Math.min(...l.slice(visibleIndexRange.from, visibleIndexRange.to + 1))));
             
             const xSize = (this.xColumn.length - 2) * xStep;
@@ -474,9 +476,8 @@
         }
 
         init() {
-            //this.viewPortEl.style('pointer-events', 'bounding-box');
-            //this.viewPortEl.el.onclick = (e )=> {this.onViewPortClick(e)};
             this.viewPortBackdropEl.on('click', (e )=> {this.onViewPortClick(e)});
+            this.viewPortBackdropEl.on('mousemove', (e )=> {this.onViewPortClick(e)});
         }
 
         hide() {
@@ -484,7 +485,6 @@
 
             for(let i =0; i < this.circleElements.length; i++) {
                 this.circleElements[i].attr('display', 'none');
-            
             }
             this.lineEl.attr('display', 'none');
             this.tooltipEl.style('display', 'none');
@@ -531,6 +531,9 @@
                 this.isCreatedElements = true;
             }
 
+            const visibleLines = this.viewPort.getEnabledLinesIds();
+            if(visibleLines.length == 0) return;
+
             this.opened = true;
 
             const hm = this.viewPort.currentTransformations.hm;
@@ -544,7 +547,6 @@
             const xValue = this.viewPort.xColumn[pIdx];
             const xDate = new Date(xValue);
 
-            const visibleLines = this.viewPort.getEnabledLinesIds();
             const m = mmul(vm, hm);
 
             for(let i = 0; i < visibleLines.length; i++) {
@@ -556,7 +558,7 @@
                 const translatedPoint = pmul([xPoint, yPoint] ,m);
                 circleEl.attr('cx', translatedPoint[0]);
                 circleEl.attr('cy', translatedPoint[1]);
-                this.circleElements[i].attr('display', '');
+                circleEl.attr('display', '');
 
                 this.tooltipValuesElMap[lId].innerText('' + yPoint);
                 this.tooltipValuesBlocksElMap[lId].style('display', 'inline-block')
@@ -570,7 +572,13 @@
             const dateLabel = { weekday: 'short', month: 'short', day: 'numeric' };            
             this.tooltipDateEl.innerText(xDate.toLocaleDateString(userLang, dateLabel));
             this.tooltipEl.style('display', 'block');
-            this.tooltipEl.style('left', pmulX(xPoint ,m) - 10 + 'px');
+            
+            const baseX = pmulX(xPoint ,m);
+            const tooltipRect = this.tooltipEl.el.getBoundingClientRect();
+            const tooltipWidth = tooltipRect.width;
+            let tooltipPosX = limit(baseX - 10, 0, this.sizes.width - tooltipWidth);
+
+            this.tooltipEl.style('left', tooltipPosX + 'px');
             this.tooltipEl.style('top', 20 + 'px');
 
             this.lineEl.attr('display', 'block');

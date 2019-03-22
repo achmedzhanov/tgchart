@@ -31,9 +31,14 @@ body.hight {
     padding: 10px;
     border-radius: 5px;
     box-shadow: 0 0px 5px #dfe6eb;
-    
     background-color: #ffffff;
     top: 10px;
+    transition: .15s ease;
+    transition-property: left, top;
+}
+
+.chart-tooltip-values {
+    white-space: nowrap;
 }
 
 .chart-tooltip .chart-tooltip-value-block {
@@ -45,6 +50,7 @@ body.hight {
     font-size: 16px;
     font-weight: bold;
     margin-bottom: 8px;
+    color: #222222;
 }
 
 .chart-tooltip .chart-tooltip-value {
