@@ -62,6 +62,30 @@
         }
     }
 
+    const linear = (v) => v;
+    const animationsMap = {};
+    const animateSteps = (options) => {
+        let {key, range, duration, ease, step, onCancel, onFinish} = options;
+        ease = ease || linear;
+        range = range || {from: 0, to: 1};
+        duration = duration || 300;
+        if(animationsMap[key]) {
+            cancelAnimationFrame(animationsMap[key]);
+            onCancel && onCancel();
+            animationsMap[key] = undefined;
+        }
+        let startTime = new Date();
+        const a = () => {
+            let p = (startTime - new Date()) / duration;
+            if(p >= 1) {
+                onFinish && onFinish();
+            } else {
+                step = step(range.from + (range.to - range.from) * ease(p));
+                animationsMap[key] = requestAnimationFrame(a);
+            }
+        };
+    }
+
     class ElementBuilder {
         constructor(el) {
             this._el = el;
@@ -279,11 +303,11 @@
                 chartData: chartData, 
                 sizes: { width: state.sizes.width, height: miniMapHeight},
                 strokeWidth: '1px',
-                range: initialRange
+                range: {from: 0, to: 100}
             });
             miniCVP.init();
             state.miniCVP = miniCVP;
-            miniCVP.updateRange(initialRange, true)
+            miniCVP.updateRange({from: 0, to: 100}, true)
 
             const minRangeWidth =  Math.max(2 / (xColumn.length - 1) * 100, (1 / state.sizes.width) * 100, 5);
             const rangeSelector = new RangeSelector({range: initialRange, containerEl: miniMapBlockEl.el, minRangeWidth: minRangeWidth});

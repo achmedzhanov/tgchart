@@ -2,8 +2,9 @@ body.day {
     background-color:  #ffffff;
 }
 
-body.hight {
+body.night {
     background-color:  #242f3e;
+    color: #ffffff;
 }
 
 .chart-container svg text{
@@ -26,6 +27,11 @@ body.hight {
     position: relative;
 }
 
+.night .chart-tooltip {
+    background-color: #242f3e;
+    box-shadow: 0 0px 5px #202a38;
+}
+
 .chart-tooltip {
     position: absolute;
     padding: 10px;
@@ -33,8 +39,8 @@ body.hight {
     box-shadow: 0 0px 5px #dfe6eb;
     background-color: #ffffff;
     top: 10px;
-    transition: .15s ease;
-    transition-property: left, top;
+    /*transition: .15s ease;
+    transition-property: left, top;*/
 }
 
 .chart-tooltip-values {
@@ -47,10 +53,11 @@ body.hight {
 }
 
 .chart-tooltip .chart-tooltip-date {
+    white-space: nowrap;
     font-size: 16px;
-    font-weight: bold;
+    /*font-weight: bold;*/
     margin-bottom: 8px;
-    color: #222222;
+    /*color: #222222;*/
 }
 
 .chart-tooltip .chart-tooltip-value {
@@ -67,8 +74,12 @@ body.hight {
     stroke-width: 2px;
 }
 
-.hight .chart-tooltip-circle {
+.night .chart-tooltip-circle {
     fill: #242f3e;
+}
+
+.night .chart-tooltip-line {
+    stroke: #3b4a5a;
 }
 
 .chart-tooltip-line {
@@ -94,10 +105,18 @@ body.hight {
     opacity: 0;
 }
 
+.night .chart-y-line {
+    stroke: #293544;
+}
+
 .chart-y-line {
     stroke: #f2f4f5;
     stroke-width: 1px;
     fill: none; 
+}
+
+.night .chart-x-line-text , .night .chart-y-line-text {
+    fill: #546778;
 }
 
 .chart-x-line-text , .chart-y-line-text {
@@ -122,28 +141,42 @@ body.hight {
     touch-action: none;
 }
 
+.night .chart-range-selector .slider {
+    border-color: rgba(64, 86, 107, .5);
+}
+
 .chart-range-selector .slider {
     position: absolute;
     height: 100%;
     top: 0;
     background-color: transparent;
-    border-top: 1px solid #e0eaf0;
-    border-bottom:  1px solid #e0eaf0;
+    border-top: 1px solid rgba(221, 234, 243, .75);
+    border-bottom:  1px solid rgba(221, 234, 243, .75);
     box-sizing: border-box;
     z-index: 2;
+}
+
+.night .chart-range-selector .left-gripper, .night .chart-range-selector .right-gripper {
+    background-color: rgba(64, 86, 107, .5);
 }
 
 .chart-range-selector .left-gripper, .chart-range-selector .right-gripper {
     position: absolute;
     height: 100%;
     top: 0;
-    background-color: #e0eaf0;
+    background-color: rgba(221, 234, 243, .75);
     width: 5px;
     cursor: w-resize;
     z-index: 3;
 }
 
-.chart-range-selector .left-curtain, .right-curtain {
+
+
+.night .chart-range-selector .left-curtain, .night .chart-range-selector .right-curtain {
+    background-color: rgba(31, 42, 56, .5);
+}
+
+.chart-range-selector .left-curtain, .chart-range-selector .right-curtain {
     /*background-color: rgba(206, 227,240, .5);*/
     background-color: rgba(223, 234, 240, .5);
     position: absolute;
@@ -163,6 +196,11 @@ body.hight {
 }
 
 .chart-toggle-buttons .toggle-button:focus {outline:0;}
+
+.night .chart-toggle-buttons .toggle-button {
+    border-color: #344658;
+    color: #e8ecee;
+}
 
 .chart-toggle-buttons .toggle-button {
     color: #43484b;
@@ -198,4 +236,8 @@ body.hight {
 .chart-toggle-buttons .toggle-button .circle-figure .checkmark {
     margin-bottom: -2px;
     fill: #fff;
+}
+
+.night .chart-toggle-buttons .toggle-button .circle-figure .checkmark {
+    fill: #242f3e;
 }
