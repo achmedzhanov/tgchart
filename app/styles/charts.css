@@ -26,13 +26,18 @@ body.hight {
     position: relative;
 }
 
-.chart-hover-circle {
+.chart-tooltip-circle {
     fill: #ffffff;
     stroke-width: 2px;
 }
 
-.hight .chart-hover-circle {
+.hight .chart-tooltip-circle {
     fill: #242f3e;
+}
+
+.chart-tooltip-line {
+    stroke-width: 1px;
+    stroke: #dfe6eb;
 }
 
 .animate-transform {

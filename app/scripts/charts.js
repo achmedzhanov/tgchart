@@ -229,7 +229,7 @@
             this.viewPortEl = new ElementBuilder(options.viewPortEl);
             this.viewPort = options.viewPort;
 
-            const cph = new ChartPositionHighlighter({viewPortEl: cvp.linesGC.el, hoverContainerEl: cvp.hoverContainerG.el, viewPort: cvp});
+            const cph = new ChartsTooltip({viewPortEl: cvp.linesGC.el, hoverContainerEl: cvp.hoverContainerG.el, viewPort: cvp, sizes: state.sizes});
             cph.init();
             state.cph = cph;            
 
@@ -442,18 +442,18 @@
         }
     }
 
-    class ChartPositionHighlighter {
+    class ChartsTooltip {
         constructor(options) {
             this.viewPortEl = new ElementBuilder(options.viewPortEl);
             this.hoverContainerEl = new ElementBuilder(options.hoverContainerEl);
             this.viewPort = options.viewPort;
+            this.sizes = options.sizes;
+            this.isCreatedElements = false;
             this.circleElementsMap = {};
             this.circleElements = [];
         }
 
         init() {
-            //this.viewPortEl.on('pointerclick', (e)=> {this.onViewPortClick(e)});
-            //this.viewPortEl.on('click', (e )=> {this.onViewPortClick(e)});
             this.viewPortEl.style('pointer-events', 'bounding-box');
             this.viewPortEl.el.onclick = (e )=> {this.onViewPortClick(e)};
         }
@@ -461,10 +461,39 @@
         hide() {
             for(let i =0; i < this.circleElements.length; i++) {
                 this.circleElements[i].attr('display', 'none');
+            
             }
+            this.lineEl.style('display', 'none');
+            // this.tooltipEl.style('display', 'none');
         }
+        createElements() {
 
+            this.lineEl = createSVG('path').attr('d', 'M0 0 L0 ' + (this.sizes.height)).attr('display', 'none')
+            .addClass('chart-tooltip-line').appendTo(this.hoverContainerEl);
+            
+            for(let i = 0; i < this.viewPort.chartColumnsIds.length; i++) {
+                const lId = this.viewPort.chartColumnsIds[i];
+                const c = createSVG('circle')
+                .attr('display', 'none')
+                .attr('stroke', this.viewPort.colorsMap[lId])
+                .attr('cx', '0')
+                .attr('cy', '0')
+                .attr('r', '3')
+                .addClass('chart-tooltip-circle')
+                .appendTo(this.hoverContainerEl);
+                this.circleElementsMap[lId] = c;
+                this.circleElements.push(c)
+            }
+
+            //create_div
+        }
         onViewPortClick(e) {
+
+            if(!this.isCreatedElements) {
+                this.createElements();
+                this.isCreatedElements = true;
+            }
+
             const hm = this.viewPort.currentTransformations.hm;
             const vm = this.viewPort.currentTransformations.vm;
 
@@ -476,38 +505,22 @@
             const xValue = this.viewPort.xColumn[pIdx];
             const xDate = new Date(xValue);
 
-            if(Object.keys(this.circleElementsMap).length == 0) {
-                for(let i = 0; i < this.viewPort.chartColumnsIds.length; i++) {
-                    const lId = this.viewPort.chartColumnsIds[i];
-                    const c = createSVG('circle')
-                    .attr('display', 'none')
-                    .attr('stroke', this.viewPort.colorsMap[lId])
-                    .attr('cx', '0')
-                    .attr('cy', '0')
-                    .attr('r', '3')
-                    .addClass('chart-hover-circle')
-                    .appendTo(this.hoverContainerEl);
-                    this.circleElementsMap[lId] = c;
-                    this.circleElements.push(c)
-                }
-            }
-            
             const visibleLines = this.viewPort.getVisibleLinesIds();
+            const m = mmul(vm, hm);
+
             for(let i = 0; i < visibleLines.length; i++) {
                 const lId = visibleLines[i];
                 const circleEl = this.circleElementsMap[lId];
                 const y = this.viewPort.columnsMap[lId][pIdx];
                 const yPoint = this.viewPort.transformY(y);
-                const translatedPoint = pmul([xPoint, yPoint] ,mmul(vm, hm));
+                const translatedPoint = pmul([xPoint, yPoint] ,m);
                 circleEl.attr('cx', translatedPoint[0]);
                 circleEl.attr('cy', translatedPoint[1]);
                 this.circleElements[i].attr('display', '');
             }
 
-            // create circles
-
-            // create line
-
+            this.lineEl.attr('display', '');
+            this.lineEl.attr('transform', 'translate(' + pmulX(xPoint ,m)  + ', 0)')
 
             // create info box
 
