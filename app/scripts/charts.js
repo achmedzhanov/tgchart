@@ -85,7 +85,12 @@
         innerText(value) {
             this._el.innerText = value;
             return this;
-        }        
+        }
+
+        innerHTML(value) {
+            this._el.innerHTML = value;
+            return this;
+        }                
     
         style(name, value) {
             this._el.style[name] = value;
@@ -124,7 +129,7 @@
         const {el, chartData, title} = options;
         let {sizes} = options;
         sizes = sizes || {width: 500, height: 250};
-        const {columns, names, types} = chartData;
+        const {columns, names, types, colors} = chartData;
         const chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
         const columnsMap = {};
         for(let c of columns) {
@@ -286,7 +291,7 @@
             rangeSelector.onRangeChanged = (r) => { cph.hide(); cvp.updateRange(r); };
 
             const toggleGroupEl = createEl('div').appendTo(el);
-            const tg = new ToggleGroup({containerEl: toggleGroupEl.el, names});
+            const tg = new ToggleGroup({containerEl: toggleGroupEl.el, names, colors});
             tg.onToogle = (lId) => {cph.hide(); toggleLine(lId);}
 
             el['__chart_state__'] = state;
@@ -958,34 +963,50 @@
         }        
     }
 
+
+    const checkmark = '<svg class="checkmark"  version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" width="14px" height="14px" viewBox="0 0 45.701 45.7"	>'
+    + '<g><g>'
+    + '<path d="M20.687,38.332c-2.072,2.072-5.434,2.072-7.505,0L1.554,26.704c-2.072-2.071-2.072-5.433,0-7.504'
+    + 'c2.071-2.072,5.433-2.072,7.505,0l6.928,6.927c0.523,0.522,1.372,0.522,1.896,0L36.642,7.368c2.071-2.072,5.433-2.072,7.505,0'
+    + 'c0.995,0.995,1.554,2.345,1.554,3.752c0,1.407-0.559,2.757-1.554,3.752L20.687,38.332z"/>'
+    + '</g></g></svg>';
+
     class ToggleGroup {
         
         constructor(options) {
-            const {names} = options;
+            const {names, colors} = options;
             this.names = names;
+            this.colors = colors;
             this.el = new ElementBuilder(options.containerEl);
             this.onToogle = () => {};
             this.init();
         }
 
         init() {
-            this.el.addClass('chart-toogle-buttons');
+            this.el.addClass('chart-toggle-buttons');
             for (let k of Object.keys(this.names)) {
                 let toggled = true;
                 const n = this.names[k];
                 const bEl = createEl('button')
-                .addClass('button')
+                .addClass('toggle-button')
                 .addClass('toggled')
-                .innerText(n)
                 .appendTo(this.el);
+                const cfEl = createEl('div').addClass('circle-figure').innerHTML(checkmark).appendTo(bEl);
+                cfEl.style('border-color', this.colors[k]).style('background-color', this.colors[k]);
+                
+                const span = createEl('span').appendTo(bEl);                
+                span.innerText(n);
 
                 bEl.el.onclick = () => {
                     toggled = !toggled;
                     if(toggled) {
+                        cfEl.style('background-color', this.colors[k]);
                         bEl.addClass('toggled');
                     } else {
+                        cfEl.style('background-color', 'transparent');
                         bEl.removeClass('toggled');
                     }
+
                     this.onToogle(k);
                 };
             }
