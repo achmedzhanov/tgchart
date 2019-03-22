@@ -478,6 +478,7 @@
         init() {
             this.viewPortBackdropEl.on('click', (e )=> {this.onViewPortClick(e)});
             this.viewPortBackdropEl.on('mousemove', (e )=> {this.onViewPortClick(e)});
+            this.checkPinterActivityToClose = (e) => {this.onSomePointerActivity(e);}
         }
 
         hide() {
@@ -490,6 +491,9 @@
             this.tooltipEl.style('display', 'none');
 
             this.opened = false;
+
+            document.removeEventListener('mousemove', this.checkPinterActivityToClose);
+            document.removeEventListener('mousedown', this.checkPinterActivityToClose);
         }
         createElements() {
 
@@ -530,6 +534,8 @@
                 this.createElements();
                 this.isCreatedElements = true;
             }
+
+            if(e.target !== this.viewPortBackdropEl.el) return;
 
             const visibleLines = this.viewPort.getEnabledLinesIds();
             if(visibleLines.length == 0) return;
@@ -584,7 +590,15 @@
             this.lineEl.attr('display', 'block');
             this.lineEl.attr('transform', 'translate(' + pmulX(xPoint ,m)  + ', 0)')
 
-            // align info box
+            document.addEventListener('mousemove', this.checkPinterActivityToClose);
+            document.addEventListener('mousedown', this.checkPinterActivityToClose);
+        }
+        onSomePointerActivity(e) {
+            if(!this.opened) return;
+            const bdr = this.viewPortBackdropEl.el.getBoundingClientRect();
+            if(!(e.clientX >= bdr.left && e.clientX <= bdr.right && e.clientY >= bdr.top && e.clientY <= bdr.bottom)) {
+                this.hide();
+            }
         }
     }
 
