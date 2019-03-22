@@ -39,11 +39,11 @@
     }
 
     const pmulX = (x, m) => {
-        return pmul([x,0], m)[0];
+        return m[0] * x + m[4];
     }
 
     const pmulY = (y, m) => {
-        return pmul([0,y], m)[1];
+        return m[3] * y + m[5];
     }    
 
     const maxSlice = (a, from, to) => Math.max(...a.slice(from, to + 1));
@@ -322,6 +322,7 @@
             if(!this.sizes) throw new 'Expected options.sizes';
 
             this.onChangeTransformations = ()=> {};
+            this.optimizedSVGTransformations = false;
         }
 
         init() {
@@ -339,10 +340,14 @@
             this.xColumn = columnsMap[this.xColumnId];
             this.fullBounds = this.getBounds({from:0, to: 100});
             this.names = names;
-            const lineElements = {};
+            const linesElements = {};
             const linesGC = createSVG('g')
-            .addClass('animate-transform')
             .appendTo(this.el);
+
+            if(this.optimizedSVGTransformations) {
+                linesGC.addClass('animate-transform');
+            }
+
             const linesG = createSVG('g')
             .appendTo(linesGC);
 
@@ -362,12 +367,16 @@
                 
                 if (t === 'line') {
                     let d = '';
-                    for(let pIdx = 1; pIdx < c.length; pIdx++) {
-                        d += (pIdx == 1 ? 'M' : 'L');
-                        d += (pIdx - 1) * xStep;
-                        d += ' ';
-                        d += transformY(c[pIdx]);
+                    
+                    if(this.optimizedSVGTransformations) {
+                        for(let pIdx = 1; pIdx < c.length; pIdx++) {
+                            d += (pIdx == 1 ? 'M' : 'L');
+                            d += (pIdx - 1) * xStep;
+                            d += ' ';
+                            d += transformY(c[pIdx]);
+                        }
                     }
+
                     const p =createSVG('path')
                     .attr('d', d)
                     .style('stroke', color)
@@ -377,11 +386,11 @@
                     .addClass('animate-opacity')
                     .appendTo(linesG);
                     
-                    lineElements[lId] = p; 
+                    linesElements[lId] = p; 
                 } 
             }
 
-            this.linesElements = lineElements;
+            this.linesElements = linesElements;
             this.linesGC = linesGC;
             this.linesG = linesG;
         }
@@ -449,8 +458,37 @@
             const vm = this.vMatrix(newBounds);
             const hm = this.hMatrix(newBounds);
     
-            this.linesGC.attr('transform', a2m(vm));
-            this.linesG.attr('transform', a2m(hm));
+            if(this.optimizedSVGTransformations) {
+                this.linesGC.attr('transform', a2m(vm));
+                this.linesG.attr('transform', a2m(hm));
+            } else {
+                const oldBouds = this.currentTransformations ? this.currentTransformations.bounds : null; 
+                const needRebuildLines = (!oldBouds) || 
+                    force || 
+                    this.currentTransformations.bounds[2] != newBounds[2] || 
+                    this.currentTransformations.bounds[3] != newBounds[3] ||
+                    Math.round((oldBouds[1] - oldBouds[0]) * 10000) !== Math.round((newBounds[1] - newBounds[0]) * 10000);
+                
+                const [xMin, xMax,] = newBounds;
+                let xScale = this.sizes.width / (xMax - xMin);
+
+                if(needRebuildLines) {
+                    const visibleLinesIds = this.getEnabledLinesIds();
+                    for (let lId of visibleLinesIds) {
+                        const c = this.columnsMap[lId];
+                        let d = '';
+                        for(let pIdx = 1; pIdx < c.length; pIdx++) {
+                            d += (pIdx == 1 ? 'M' : 'L');
+                            d += ((pIdx - 1) * xStep) * xScale;
+                            d += ' ';
+                            d += pmulY(this.transformY(c[pIdx]), vm);
+                        }
+                        this.linesElements[lId].attr('d', d);
+                    }
+                }
+
+                this.linesG.attr('transform', 'translate(' + -xMin * xScale + ', 0)');
+            }
 
             this.onChangeTransformations({bounds: newBounds, vm, hm});
             this.currentTransformations = {bounds: newBounds, vm, hm};

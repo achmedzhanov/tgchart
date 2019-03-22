@@ -76,6 +76,7 @@ body.hight {
     stroke: #dfe6eb;
 }
 
+/*
 .animate-transform {
     transition: transform 0.3s linear;
 }
@@ -87,7 +88,7 @@ body.hight {
 .animate-transform-opacity {
     transition: 0.3s linear;
     transition-property: transform, opacity;
-}
+}*/
 
 .disbled-line {
     opacity: 0;
