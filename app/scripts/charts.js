@@ -56,16 +56,16 @@
 
     const q = (cb)=> setTimeout(cb,0); 
 
-    function throttle (cb, duration) {
-        let wait = false;
-        return function () {
-            if (!wait) {
-                cb.apply(null, arguments);
-                wait = true;
-                setTimeout(function () { wait = false; }, duration);
-            }
-        }
-    }    
+    // function throttle (cb, duration) {
+    //     let wait = false;
+    //     return function () {
+    //         if (!wait) {
+    //             cb.apply(null, arguments);
+    //             wait = true;
+    //             setTimeout(function () { wait = false; }, duration);
+    //         }
+    //     }
+    // }    
 
     const getNavigatorLanguage = () => {
         if (navigator.languages && navigator.languages.length) {
@@ -75,14 +75,14 @@
         }
     }
 
-    const linear = (t) => t;
+    // const linear = (t) => t;
     const easeInQuad = function (t) { return t*t };
     const animationsMap = {};
-    let aIdSource = 0;
+    //let aIdSource = 0;
     const animateSteps = (options) => {
         let {key, range, duration, ease, step, onCancel, onFinish} = options;
         //console.log('animateSteps', options);
-        const aId = ++aIdSource;
+        //const aId = ++aIdSource;
         ease = ease || easeInQuad;
         range = range || {from: 0, to: 1};
         duration = duration || 300;
@@ -172,6 +172,8 @@
             return this._el;
         }
     }
+
+    let optimizedSVGTransformations = false;
 
     const createSVG = (type) => new ElementBuilder(document.createElementNS('http://www.w3.org/2000/svg', type));
     const createEl = (type) => new ElementBuilder(document.createElement(type));
@@ -310,7 +312,7 @@
             const xAxis = new XAxis({containerEl: xAxisG.el, xColumn: xColumn});
             state.xAxis = xAxis;            
 
-            const yAxis = new YAxis({containerEl: yAxisG.el});
+            const yAxis = new YAxis({containerGEl: yAxisG.el, containerDivEl: viewPortBackdropEl.el});
             state.yAxis = yAxis;
 
             cvp.onChangeTransformations = (({bounds, vm, hm}) => {
@@ -378,7 +380,6 @@
             if(!this.sizes) throw new 'Expected options.sizes';
 
             this.onChangeTransformations = ()=> {};
-            this.optimizedSVGTransformations = false;
             this.commitMarkupB = () => this.commitMarkup();
         }
 
@@ -401,7 +402,7 @@
             const linesGC = createSVG('g')
             .appendTo(this.el);
 
-            if(this.optimizedSVGTransformations) {
+            if(optimizedSVGTransformations) {
                 linesGC.addClass('animate-transform');
             }
 
@@ -425,7 +426,7 @@
                 if (t === 'line') {
                     let d = '';
                     
-                    if(this.optimizedSVGTransformations) {
+                    if(optimizedSVGTransformations) {
                         for(let pIdx = 1; pIdx < c.length; pIdx++) {
                             d += (pIdx == 1 ? 'M' : 'L');
                             d += (pIdx - 1) * xStep;
@@ -514,10 +515,10 @@
             //     this.lastUpdate = null;
             // }
 
-            // рендер надо делать через setTimeout а не raf, т.к. тут калбэка можно не дождаться
+            // TODO spawn render from setTimeout(1000/6), not raf
 
             this.lastUpdate = requestAnimationFrame(() => {
-                console.log('requestUpdate/update', performance.now()); 
+                //console.log('requestUpdate/update', performance.now()); 
                 u();
                 this.lastUpdate = null;
             });
@@ -540,7 +541,7 @@
             const vm = this.vMatrix(newBounds);
             const hm = this.hMatrix(newBounds);
     
-            if(this.optimizedSVGTransformations) {
+            if(optimizedSVGTransformations) {
                 this.linesGC.attr('transform', a2m(vm));
                 this.linesG.attr('transform', a2m(hm));
             } else {
@@ -556,8 +557,8 @@
                     if(this.currentTransformations.bounds[2] != newBounds[2] || 
                         this.currentTransformations.bounds[3] != newBounds[3]) {
                             
-                            // TODO scale duration depe
-                            const duration = 300; 
+                            // TODO adapt duration to scale difference
+                            const duration = 200; 
                             animateSteps({
                                 key: this.animationUidKey, 
                                 range: {from: this.markupState.yScale, to: yScale}, 
@@ -622,7 +623,7 @@
             } else {
                 lEl.removeClass('disabled-line');
             }
-            // if(this.optimizedSVGTransformations) {
+            // if(optimizedSVGTransformations) {
                 this.disabled[lId] = disabled;
                 this.updateRange(this.visibleRange, true);
             // } else {
@@ -697,6 +698,8 @@
             }
         }
         onViewPortClick(e) {
+
+            if(!this.viewPort.currentTransformations) return;
 
             if(!this.isCreatedElements) {
                 this.createElements();
@@ -859,7 +862,9 @@
     class YAxis {
         
         constructor(options) {
-            this.el = new ElementBuilder(options.containerEl);
+            const c = optimizedSVGTransformations ? options.containerGEl : options.containerDivEl;
+            this.el = new ElementBuilder(c);
+
             this.elementsCache = {};
             this.currentRangeKey = null;
             this.currentBounds = null;
@@ -938,31 +943,47 @@
             const lc = lines.length;
             for(let i = 0;i < lc;i++) {
                 let y = lines[i].y;
-                const lEl = createSVG('path')
-                .style('fill', 'none')
-                .style('vector-effect', 'non-scaling-stroke')
-                .attr('d',  'M0 0 L' + (this.sizes.width) +' 0')
-                .attr('transform',  'matrix(1,0,0,1,0,' + y + ')')
-                .addClass('chart-y-line')
-                .addClass('animate-transform-opacity')
-                .appendTo(this.el);
-                hGridLines.push(lEl);
-                cb(lEl);
-    
-                const tEl = createSVG('text')
-                .attr('x',  '0')
-                .attr('y',  '0')
-                .attr('transform',  'matrix(1,0,0,1,0,' + (y - 5) + ')')
-                .attr('font-family', 'sans-serif')
-                .attr('font-size', '10')
-                .attr('fill', 'gray')
-                .textContent('' + lines[i].text)
-                .addClass('chart-y-line-text')
-                .addClass('animate-transform-opacity')
-                .appendTo(this.el);
-                hGridTexts.push(tEl);
-                cb(tEl);
-    
+                
+                if(optimizedSVGTransformations) {
+                    const lEl = createSVG('path')
+                    .style('vector-effect', 'non-scaling-stroke')
+                    .attr('d',  'M0 0 L' + (this.sizes.width) +' 0')
+                    .attr('transform',  'matrix(1,0,0,1,0,' + y + ')')
+                    .addClass('chart-y-line')
+                    .addClass('animate-transform-opacity')
+                    .appendTo(this.el);
+                    hGridLines.push(lEl);
+                    cb(lEl);
+        
+                    const tEl = createSVG('text')
+                    .attr('x',  '0')
+                    .attr('y',  '0')
+                    .attr('transform',  'matrix(1,0,0,1,0,' + (y - 5) + ')')
+                    .attr('font-family', 'sans-serif')
+                    .attr('font-size', '10')
+                    .attr('fill', 'gray')
+                    .textContent('' + lines[i].text)
+                    .addClass('chart-y-line-text')
+                    .addClass('animate-transform-opacity')
+                    .appendTo(this.el);
+                    hGridTexts.push(tEl);
+                    cb(tEl);
+                } else {
+                    const lEl = createEl('div')
+                    .style('top',  y + 'px')
+                    .addClass('chart-y-line')
+                    .appendTo(this.el);
+                    hGridLines.push(lEl);
+                    cb(lEl);
+        
+                    const tEl = createEl('div')
+                    .style('top',  y + 'px')
+                    .innerText('' + lines[i].text)
+                    .addClass('chart-y-line-text')
+                    .appendTo(this.el);
+                    hGridTexts.push(tEl);
+                    cb(tEl);                    
+                }
             }     
             return {hGridLines, hGridTexts};       
         }
@@ -973,15 +994,25 @@
             for(let i = 0; i < lc; i++) {
                 let y = lines[i].y;
                 
-                hGridLines[i]
-                .attr('d',  'M0 0 L' + (this.sizes.width) +' 0')
-                .attr('transform',  'matrix(1,0,0,1,0,' + y + ')');
-                cb(hGridLines[i]);
-                
-                hGridTexts[i]
-                //.textContent('' + lines[i].text)
-                .attr('transform',  'matrix(1,0,0,1,0,' + (y - 5) + ')');
-                cb(hGridTexts[i]);
+                if(optimizedSVGTransformations) {
+                    hGridLines[i]
+                    .attr('d',  'M0 0 L' + (this.sizes.width) +' 0')
+                    .attr('transform',  'matrix(1,0,0,1,0,' + y + ')');
+                    cb(hGridLines[i]);
+                    
+                    hGridTexts[i]
+                    //.textContent('' + lines[i].text)
+                    .attr('transform',  'matrix(1,0,0,1,0,' + (y - 5) + ')');
+                    cb(hGridTexts[i]);
+                } else {
+                    hGridLines[i]
+                    .style('top',  y + 'px')
+                    cb(hGridLines[i]);
+                    
+                    hGridTexts[i]
+                    .style('top',  y + 'px')
+                    cb(hGridTexts[i]);
+                }
             }     
         }        
 
