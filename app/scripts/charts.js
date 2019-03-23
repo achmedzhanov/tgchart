@@ -363,8 +363,11 @@
         init();
     }
 
+    let chartViewPortUidSource = 0;
     class ChartViewPort {
         constructor(options) {
+            this.uid = ++chartViewPortUidSource;
+            this.animationUidKey = 'chart-view-port-' + this.uid;
             this.el = new ElementBuilder(options.containerEl);
             this.chartData = options.chartData;
             this.sizes = options.sizes;
@@ -467,6 +470,10 @@
             return m;
         }
 
+        getAllLinesIds() {
+            return this.chartColumnsIds;
+        }        
+
         getEnabledLinesIds() {
             return this.chartColumnsIds.filter(lid => !this.disabled[lid]);
         }
@@ -542,49 +549,27 @@
                 const [xMin, xMax, yMin, yMax] = newBounds;
                 let xScale = this.sizes.width / (xMax - xMin);
                 let yScale = this.sizes.height / yMax;
-                
-                // check force ?
-
-                // this.markupState = {xMin, xMax, yMin, yMax, xScale, yScale};
-                // this.requestUpdate(()=>this.commitMarkup());
-                //this.commitMarkup();
-
-
+               
                 if(!oldBounds || !this.markupState) {
-                    //this.markupState = {xMin, xMax, yMin, yMax, xScale, yScale};
-                    // this.requestUpdate(()=>this.commitMarkup());
-                    //this.commitMarkup();
                     this.requestCommit({xMin, xMax, yMin, yMax, xScale, yScale});
                 } else {
                     if(this.currentTransformations.bounds[2] != newBounds[2] || 
                         this.currentTransformations.bounds[3] != newBounds[3]) {
                             
-                            //what_is_about_update_x!
-
-                            // animate y scale
-                            oldBounds && animateSteps({
-                                key: 'chart-viewport-v', 
+                            // TODO scale duration depe
+                            const duration = 300; 
+                            animateSteps({
+                                key: this.animationUidKey, 
                                 range: {from: this.markupState.yScale, to: yScale}, 
-                                duration: 200, step: (yScale)=> {
-                                    //this.markupState = {...this.markupState, yScale};
-                                    //this.requestUpdate(()=>this.commitMarkup());
-                                    //this.commitMarkup();
+                                duration: duration, step: (yScale)=> {
                                     this.requestCommit({...this.markupState, yScale});
                                 }, onFinish: (yScale)=> {
-                                    //this.markupState = {...this.markupState, yScale};
-                                    //this.requestUpdate(()=>this.commitMarkup());
-                                    //this.commitMarkup();
                                     this.requestCommit({...this.markupState, yScale});
                                 } 
                             });                            
                     } 
-                    // else {
-                        
-                        // this.markupState = {...this.markupState, xMin, xMax, xScale};
-                        // this.requestUpdate(()=>this.commitMarkup());
-                        // this.commitMarkup();
-                        this.requestCommit({...this.markupState, xMin, xMax, xScale});
-                    // }
+                    
+                    this.requestCommit({...this.markupState, xMin, xMax, xScale});
                 }
             }
             // todo merge hm & vm
@@ -611,7 +596,7 @@
             const commitedMarkeupState = this.commitedMarkupState
             if(!commitedMarkeupState || yScale != commitedMarkeupState.yScale || xScale != commitedMarkeupState.xScale) {
                 const vm  = this.vMatrixByScale(yScale);
-                const visibleLinesIds = this.getEnabledLinesIds();
+                const visibleLinesIds = this.getAllLinesIds();
                 for (let lId of visibleLinesIds) {
                     // todo check lines opacity!
                     const c = this.columnsMap[lId];
@@ -630,14 +615,19 @@
         }
 
         toggleLine(lId)  {
-            this.disabled[lId] = !this.disabled[lId];
+            const disabled = !this.disabled[lId];
             const lEl = this.linesElements[lId];
-            if(this.disabled[lId]) {
-                lEl.addClass('disbled-line');
+            if(disabled) {
+                lEl.addClass('disabled-line');
             } else {
-                lEl.removeClass('disbled-line');
+                lEl.removeClass('disabled-line');
             }
-            this.updateRange(this.visibleRange, true);
+            // if(this.optimizedSVGTransformations) {
+                this.disabled[lId] = disabled;
+                this.updateRange(this.visibleRange, true);
+            // } else {
+            //     animateSteps  todo
+            // }
         }
     }
 
