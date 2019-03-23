@@ -267,7 +267,6 @@ div.chart-y-line-text {
 .chart-range-selector {
     position: relative;
     touch-action: none;
-    margin-top: 26px;
 }
 
 .night .chart-range-selector .slider {

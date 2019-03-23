@@ -231,16 +231,22 @@
                 createEl('div').addClass('title').innerText(title).appendTo(el);
             }
             const svgElC = createEl('div').addClass('chart-view-port').style('position', 'relative').appendTo(el);
+            
+            const viewPortPaddings = {left: 0, right: 0, top: 2, bottom: 2};
+            const xAxisHeight = 20;
             if(!sizes) {
                 sizes = {width: svgElC.el.offsetWidth || 500, height: svgElC.el.offsetHeight || 500}; 
             }
             state.sizes = sizes;            
+            state.viewPortSizes = { 
+                width: sizes.width - viewPortPaddings.left - viewPortPaddings.right, 
+                height: sizes.height - viewPortPaddings.top - viewPortPaddings.bottom - xAxisHeight
+            };            
             
             const fullBounds = getBounds(null);
             state.fullBounds = fullBounds;
             const [, , yMin, yMax] = fullBounds;
             
-            const xAxisHeight = 20;
             const svgWidth = sizes.width;
             const svgHeight = sizes.height + xAxisHeight;
             const viewPortWidth = sizes.width;
@@ -259,8 +265,6 @@
                 return svgElBuilder;
             }
            
-            const viewPortPaddings = {left: 0, right: 0, top: 2, bottom: 2};
-
             console.log('svgElC w h ', svgElC.el.offsetWidth, svgElC.el.offsetHeight);
 
             const viewPortBackdropEl = createEl('div')
@@ -285,7 +289,7 @@
             const xAxisG =  createSVG('g')
             .addClass('animate-transform')
             .appendTo(svgEl)
-            .attr('transform', 'translate(0, ' + (state.sizes.height + xAxisHeight * 0.8 ) + ')');
+            .attr('transform', 'translate(0, ' + (state.viewPortSizes.height + xAxisHeight * 0.8 ) + ')');
             state.elements.xAxisG = xAxisG;            
 
             const initialRange = {from: 50, to: 75};
@@ -293,7 +297,7 @@
             const cvp = new ChartViewPort({ 
                 containerEl: svgEl.el, 
                 chartData: chartData, 
-                sizes: state.sizes,
+                sizes: state.viewPortSizes,
                 range: initialRange
             });
             cvp.init();
@@ -303,7 +307,7 @@
             this.viewPort = options.viewPort;
 
             const cph = new ChartsTooltip({viewPortEl: cvp.linesGC.el, hoverContainerEl: cvp.hoverContainerG.el, 
-                viewPort: cvp, viewPortBackdropEl: viewPortBackdropEl.el, sizes: state.sizes});
+                viewPort: cvp, viewPortBackdropEl: viewPortBackdropEl.el, sizes: state.viewPortSizes});
             cph.init();
             state.cph = cph;            
 
@@ -323,15 +327,15 @@
             svgEl.appendTo(svgElC);
 
             const miniMapHeight = 30;
-            const miniMapBlockEl = createEl('div').addClass('chart-range-selector').style('width', state.sizes.width + 'px').appendTo(el);
+            const miniMapBlockEl = createEl('div').addClass('chart-range-selector').style('width', state.viewPortSizes.width + 'px').appendTo(el);
             const miniMapEl = createSVG('svg').appendTo(miniMapBlockEl);
             
-            setSvgSizes(miniMapEl, state.sizes.width, miniMapHeight, {left: 0, right: 0, top: 2, bottom: 2});
+            setSvgSizes(miniMapEl, state.viewPortSizes.width, miniMapHeight, {left: 0, right: 0, top: 2, bottom: 2});
 
             const miniCVP = new ChartViewPort({ 
                 containerEl: miniMapEl.el, 
                 chartData: chartData, 
-                sizes: { width: state.sizes.width, height: miniMapHeight},
+                sizes: { width: state.viewPortSizes.width, height: miniMapHeight},
                 strokeWidth: '1px',
                 range: {from: 0, to: 100}
             });
@@ -339,7 +343,7 @@
             state.miniCVP = miniCVP;
             miniCVP.updateRange({from: 0, to: 100}, true)
 
-            const minRangeWidth =  Math.max(2 / (xColumn.length - 1) * 100, (1 / state.sizes.width) * 100, 5);
+            const minRangeWidth =  Math.max(2 / (xColumn.length - 1) * 100, (1 / state.viewPortSizes.width) * 100, 5);
             const rangeSelector = new RangeSelector({range: initialRange, containerEl: miniMapBlockEl.el, minRangeWidth: minRangeWidth});
             rangeSelector.init();
             rangeSelector.onRangeChanged = (r) => { cph.hide(); cvp.updateRange(r); };
@@ -832,7 +836,7 @@
             // todo check same xscale!
 
             // eval visible labels
-            const maxLabelInViewPort = Math.trunc(state.sizes.width / this.getLabelWidth ()); // todo some coef for padding
+            const maxLabelInViewPort = Math.trunc(state.viewPortSizes.width / this.getLabelWidth ()); // todo some coef for padding
             const w = bounds[1] - bounds[0];
             const actualLabelInViewPort = w / xStep;
             const k = actualLabelInViewPort / maxLabelInViewPort;
@@ -870,7 +874,7 @@
         }
 
         updateRange(bounds, state, vm) {
-            this.sizes = state.sizes;
+            this.sizes = state.viewPortSizes;
             this.transformY = state.transformY;
 
             const [,,yMin,yMax] = bounds;
