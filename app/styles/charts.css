@@ -87,7 +87,7 @@ body.night {
     stroke: #dfe6eb;
 }
 
-/*
+
 .animate-transform {
     transition: transform 0.3s linear;
 }
@@ -96,6 +96,7 @@ body.night {
     transition: opacity 0.3s linear;
 }
 
+/*
 .animate-transform-opacity {
     transition: 0.3s linear;
     transition-property: transform, opacity;
@@ -103,6 +104,11 @@ body.night {
 
 .disbled-line {
     opacity: 0;
+}
+
+.chart-line {
+    /*transition: 0.3s linear;
+    transition-property: d, opacity;*/
 }
 
 .night .chart-y-line {

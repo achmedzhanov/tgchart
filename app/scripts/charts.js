@@ -1,5 +1,7 @@
 (function (g) {
 
+    //console.log = ()=> {};
+
     const U = {
         keyBy: (a, f) => a.reduce((prev,el) => {
             const [p, v] = f(el);
@@ -54,6 +56,17 @@
 
     const q = (cb)=> setTimeout(cb,0); 
 
+    function throttle (cb, duration) {
+        let wait = false;
+        return function () {
+            if (!wait) {
+                cb.apply(null, arguments);
+                wait = true;
+                setTimeout(function () { wait = false; }, duration);
+            }
+        }
+    }    
+
     const getNavigatorLanguage = () => {
         if (navigator.languages && navigator.languages.length) {
           return navigator.languages[0];
@@ -62,28 +75,44 @@
         }
     }
 
-    const linear = (v) => v;
+    const linear = (t) => t;
+    const easeInQuad = function (t) { return t*t };
     const animationsMap = {};
+    let aIdSource = 0;
     const animateSteps = (options) => {
         let {key, range, duration, ease, step, onCancel, onFinish} = options;
-        ease = ease || linear;
+        //console.log('animateSteps', options);
+        const aId = ++aIdSource;
+        ease = ease || easeInQuad;
         range = range || {from: 0, to: 1};
         duration = duration || 300;
-        if(animationsMap[key]) {
+        //console.log('animate/new' + '\t\t\t\t#' + aId );
+        if(key && animationsMap[key]) {
+            //console.log('animate/cancel' + '\t\t\t\t#' + aId );
             cancelAnimationFrame(animationsMap[key]);
             onCancel && onCancel();
             animationsMap[key] = undefined;
         }
+        // TODO use performnce.now instead of new Date ???
         let startTime = new Date();
         const a = () => {
-            let p = (startTime - new Date()) / duration;
+            let p = (new Date() - startTime) / duration;
+            if(p >= 1) p = 1;
+            //console.log('\tanimate/if' + '\t\t\t#' + aId , p);
+            const v = range.from + (range.to - range.from) * ease(p);
+            //console.log('as/t\t\t\t\t\t\t\t\t\t', v, p, performance.now());
             if(p >= 1) {
-                onFinish && onFinish();
+                //console.log('\t\tanimate/finish' + '\t#' + aId , p);
+                onFinish && onFinish(v);
             } else {
-                step = step(range.from + (range.to - range.from) * ease(p));
-                animationsMap[key] = requestAnimationFrame(a);
+                //console.log('\t\tanimate/step' + '\t#' + aId , p);
+                step(v);
+                const rId = requestAnimationFrame(a);
+                if(key) animationsMap[key] = rId;
             }
         };
+        const rId = requestAnimationFrame(a);
+        if(key) animationsMap[key] = rId;
     }
 
     class ElementBuilder {
@@ -347,6 +376,7 @@
 
             this.onChangeTransformations = ()=> {};
             this.optimizedSVGTransformations = false;
+            this.commitMarkupB = () => this.commitMarkup();
         }
 
         init() {
@@ -402,6 +432,7 @@
                     }
 
                     const p =createSVG('path')
+                    .addClass('chart-line')
                     .attr('d', d)
                     .style('stroke', color)
                     .style('stroke-width', this.strokeWidth)
@@ -470,19 +501,31 @@
         }
 
         requestUpdate(u) {
-            if(this.lastUpdate) cancelAnimationFrame();
+            // if(this.lastUpdate) { 
+            //     console.log('requestUpdate/cancelAnimationFrame'); 
+            //     cancelAnimationFrame(this.lastUpdate); 
+            //     this.lastUpdate = null;
+            // }
+
+            // рендер надо делать через setTimeout а не raf, т.к. тут калбэка можно не дождаться
+
             this.lastUpdate = requestAnimationFrame(() => {
+                console.log('requestUpdate/update', performance.now()); 
                 u();
                 this.lastUpdate = null;
             });
         }
 
+        requestCommit(s) {
+            //console.log('request yScale', s.yScale);
+            this.markupState = s;
+            this.requestUpdate(this.commitMarkupB);
+        }
+
         updateRange(range, force) {
             
             range = range || {from: 0, to: 100};
-            
             if(this.visibleRange.from == range.from && this.visibleRange.to == range.to && !force) return;
-            
             this.visibleRange = range;
             
             const newBounds = this.getBounds(range);
@@ -494,41 +537,96 @@
                 this.linesGC.attr('transform', a2m(vm));
                 this.linesG.attr('transform', a2m(hm));
             } else {
-                const oldBouds = this.currentTransformations ? this.currentTransformations.bounds : null; 
-                const needRebuildLines = (!oldBouds) || 
-                    force || 
-                    this.currentTransformations.bounds[2] != newBounds[2] || 
-                    this.currentTransformations.bounds[3] != newBounds[3] ||
-                    Math.round((oldBouds[1] - oldBouds[0]) * 10000) !== Math.round((newBounds[1] - newBounds[0]) * 10000);
-                
-                const [xMin, xMax,] = newBounds;
+                const oldBounds = this.currentTransformations ? this.currentTransformations.bounds : null; 
+
+                const [xMin, xMax, yMin, yMax] = newBounds;
                 let xScale = this.sizes.width / (xMax - xMin);
+                let yScale = this.sizes.height / yMax;
+                
+                // check force ?
 
-                let updates = [];
+                // this.markupState = {xMin, xMax, yMin, yMax, xScale, yScale};
+                // this.requestUpdate(()=>this.commitMarkup());
+                //this.commitMarkup();
 
-                if(needRebuildLines) {
-                    const visibleLinesIds = this.getEnabledLinesIds();
-                    for (let lId of visibleLinesIds) {
-                        const c = this.columnsMap[lId];
-                        let d = '';
-                        for(let pIdx = 1; pIdx < c.length; pIdx++) {
-                            d += (pIdx == 1 ? 'M' : 'L');
-                            d += ((pIdx - 1) * xStep) * xScale;
-                            d += ' ';
-                            d += pmulY(this.transformY(c[pIdx]), vm);
-                        }
-                        updates.push(()=> this.linesElements[lId].attr('d', d));
-                    }
+
+                if(!oldBounds || !this.markupState) {
+                    //this.markupState = {xMin, xMax, yMin, yMax, xScale, yScale};
+                    // this.requestUpdate(()=>this.commitMarkup());
+                    //this.commitMarkup();
+                    this.requestCommit({xMin, xMax, yMin, yMax, xScale, yScale});
+                } else {
+                    if(this.currentTransformations.bounds[2] != newBounds[2] || 
+                        this.currentTransformations.bounds[3] != newBounds[3]) {
+                            
+                            //what_is_about_update_x!
+
+                            // animate y scale
+                            oldBounds && animateSteps({
+                                key: 'chart-viewport-v', 
+                                range: {from: this.markupState.yScale, to: yScale}, 
+                                duration: 200, step: (yScale)=> {
+                                    //this.markupState = {...this.markupState, yScale};
+                                    //this.requestUpdate(()=>this.commitMarkup());
+                                    //this.commitMarkup();
+                                    this.requestCommit({...this.markupState, yScale});
+                                }, onFinish: (yScale)=> {
+                                    //this.markupState = {...this.markupState, yScale};
+                                    //this.requestUpdate(()=>this.commitMarkup());
+                                    //this.commitMarkup();
+                                    this.requestCommit({...this.markupState, yScale});
+                                } 
+                            });                            
+                    } 
+                    // else {
+                        
+                        // this.markupState = {...this.markupState, xMin, xMax, xScale};
+                        // this.requestUpdate(()=>this.commitMarkup());
+                        // this.commitMarkup();
+                        this.requestCommit({...this.markupState, xMin, xMax, xScale});
+                    // }
                 }
-
-                updates.push(()=> this.linesG.attr('transform', 'translate(' + -xMin * xScale + ', 0)'));
-                this.requestUpdate(()=> {
-                    for(let u of updates) u();
-                });
             }
-
+            // todo merge hm & vm
             this.onChangeTransformations({bounds: newBounds, vm, hm});
             this.currentTransformations = {bounds: newBounds, vm, hm};
+        }
+
+        vMatrixByScale(yScale) {
+            const fbyMax = this.fullBounds[3];
+            const yMax = this.sizes.height / yScale;
+            const m1 = [1,0,0,1,0, yMax * yScale], m2 = [1,0,0, yScale,0,0], m3 =[1,0,0,1,0,-fbyMax];
+            const vt = mmul(m1, mmul(m2, m3));
+            return vt;
+        }        
+
+        commitMarkup() {
+            const {xMin, yScale, xScale} =  this.markupState;
+            if(xMin === undefined) throw 'xMin';
+            if(xScale === undefined) throw 'xScale';
+            if(yScale === undefined) throw 'yScale';
+
+            //console.log('cimmit yScale', yScale);
+
+            const commitedMarkeupState = this.commitedMarkupState
+            if(!commitedMarkeupState || yScale != commitedMarkeupState.yScale || xScale != commitedMarkeupState.xScale) {
+                const vm  = this.vMatrixByScale(yScale);
+                const visibleLinesIds = this.getEnabledLinesIds();
+                for (let lId of visibleLinesIds) {
+                    // todo check lines opacity!
+                    const c = this.columnsMap[lId];
+                    let d = '';
+                    for(let pIdx = 1; pIdx < c.length; pIdx++) {
+                        d += (pIdx == 1 ? 'M' : 'L');
+                        d += ((pIdx - 1) * xStep) * xScale;
+                        d += ' ';
+                        d += pmulY(this.transformY(c[pIdx]), vm);
+                    }
+                    this.linesElements[lId].attr('d', d);
+                }                
+            }
+            this.linesG.attr('transform', 'translate(' + -xMin * xScale + ', 0)');
+            this.commitedMarkeupState = this.markupState;
         }
 
         toggleLine(lId)  {
@@ -990,7 +1088,7 @@
         }        
         getWidth() {
             if(this.width) return this.width;
-            return this.el.el.getBoundingClientRect().width;
+            return this.width = this.el.el.getBoundingClientRect().width;
         }
         cloneState() {
             return {leftPos: this.state.leftPos, rightPos: this.state.rightPos, w: this.state.w};
