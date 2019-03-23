@@ -20,7 +20,7 @@ onDocumentReady(() => {
                 el: el,
                 chartData: data[i],
                 title: 'Chart #' + i,
-                sizes: {width: w, height: w / 2}
+                //sizes: {width: w, height: w}
             });
         }
         window.createModeSwitcher();

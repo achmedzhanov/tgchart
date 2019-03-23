@@ -15,12 +15,95 @@ body.night {
     user-select: none;
  }
 
- .chart-container .title {
-     font-size: 20px;
-     font-weight: bold;
-     margin-top: 1rem;
-     margin-bottom: 1rem;
+
+
+/*  Desktops ##Screen = 1281px */
+@media (min-width: 1281px) {
+    .chart-container, .chart-container .chart-view-port {
+        width:75vw;
+    }
+    .chart-container .chart-view-port {
+        height:75vh;
+    }
+}
+  
+/* Laptops, Desktops B/w 1025px to 1280px */
+@media (min-width: 1025px) and (max-width: 1280px) {
+    .chart-container, .chart-container .chart-view-port {
+        width:95vw;
+    }
+    .chart-container .chart-view-port {        
+        height:75vh;
+    }
+}
+
+/* Tablets, Ipads (portrait) B/w 768px to 1024px */
+@media (min-width: 768px) and (max-width: 1024px) {
+    .chart-container, .chart-container .chart-view-port {
+        width:95vw;
+    }
+    .chart-container .chart-view-port {        
+        height:95vw;
+    }
+}
+
+/* Tablets, Ipads (landscape) B/w 768px to 1024px */
+
+@media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
+    .chart-container, .chart-container .chart-view-port {
+        width:95vw;
+    }
+    .chart-container .chart-view-port {        
+        height:75vh;
+    }
+}
+
+/*  Low Resolution Tablets, Mobiles (Landscape) B/w 481px to 767px */
+ @media (min-width: 481px) and (max-width: 767px) {
+    .chart-container, .chart-container .chart-view-port {
+        width:95vw;
+    }
+    .chart-container .chart-view-port {        
+        height:75vh;
+    }
  }
+ 
+ /* Most of the Smartphones Mobiles (Portrait) Screen = B/w 320px to 479px  */
+ @media (min-width: 320px) and (max-width: 480px) {
+    .chart-container, .chart-container .chart-view-port {
+        width:95vw;
+    }
+    .chart-container .chart-view-port {        
+        height:95vw;
+    }
+ } 
+
+/* vertical orientation */
+/* .chart-container {
+    width:98vw;
+} */
+
+.chart-container {
+    margin: 20px auto 0 auto;
+    /* width: 80vh; */
+    /* width:50vh; */
+    /*height: 250px;*/
+}
+
+.chart-container .chart-view-port {
+}
+
+.chart-container .title {
+    font-size: 20px;
+    font-weight: bold;
+    margin: 1rem auto;
+}
+
+
+/* .chart-container .chart-view-port {
+    overflow: visible;
+    width: 95vh;
+} */
 
 .chart-slider {
     height: 20px;
@@ -184,6 +267,7 @@ div.chart-y-line-text {
 .chart-range-selector {
     position: relative;
     touch-action: none;
+    margin-top: 26px;
 }
 
 .night .chart-range-selector .slider {

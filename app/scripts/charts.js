@@ -183,7 +183,6 @@
     function createChart(options) {
         const {el, chartData, title} = options;
         let {sizes} = options;
-        sizes = sizes || {width: 500, height: 250};
         const {columns, names, types, colors} = chartData;
         const chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
         const columnsMap = {};
@@ -196,7 +195,6 @@
         let state = {
             disabled: U.keyBy(chartColumnsIds, (id) => [id, false]),
             visibleRange: { from: 0, to: 100},
-            aspectRatio: 2/1,
             elements: {
                 linesElements: {},
 
@@ -229,14 +227,18 @@
         };
 
         const init = () => {
+            if(title) {
+                createEl('div').addClass('title').innerText(title).appendTo(el);
+            }
+            const svgElC = createEl('div').addClass('chart-view-port').style('position', 'relative').appendTo(el);
+            if(!sizes) {
+                sizes = {width: svgElC.el.offsetWidth || 500, height: svgElC.el.offsetHeight || 500}; 
+            }
+            state.sizes = sizes;            
             
             const fullBounds = getBounds(null);
             state.fullBounds = fullBounds;
             const [, , yMin, yMax] = fullBounds;
-
-            // TODO_use_name_viewPortSize
-
-            state.sizes = sizes;
             
             const xAxisHeight = 20;
             const svgWidth = sizes.width;
@@ -256,14 +258,11 @@
                 .attr('viewBox', `${vb[0]} ${vb[1]} ${vb[2]} ${vb[3]}`);
                 return svgElBuilder;
             }
-
-            if(title) {
-                createEl('div').addClass('title').innerText(title).appendTo(el);
-            }
-            
+           
             const viewPortPaddings = {left: 0, right: 0, top: 2, bottom: 2};
 
-            const svgElC = createEl('div').style('position', 'relative').appendTo(el);
+            console.log('svgElC w h ', svgElC.el.offsetWidth, svgElC.el.offsetHeight);
+
             const viewPortBackdropEl = createEl('div')
             .style('left', viewPortPaddings.left + 'px')
             .style('top', viewPortPaddings.top + 'px')
@@ -756,7 +755,7 @@
             let tooltipPosX = limit(baseX - 10, 0, this.sizes.width - tooltipWidth);
 
             this.tooltipEl.style('left', tooltipPosX + 'px');
-            this.tooltipEl.style('top', 20 + 'px');
+            this.tooltipEl.style('top', 0 + 'px');
 
             this.lineEl.attr('display', 'block');
             this.lineEl.attr('transform', 'translate(' + pmulX(xPoint ,m)  + ', 0)')
