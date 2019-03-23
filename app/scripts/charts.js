@@ -737,7 +737,7 @@
                 circleEl.attr('cy', translatedPoint[1]);
                 circleEl.attr('display', '');
 
-                this.tooltipValuesElMap[lId].innerText('' + yPoint);
+                this.tooltipValuesElMap[lId].innerText('' + y);
                 this.tooltipValuesBlocksElMap[lId].style('display', 'inline-block')
             }
 
