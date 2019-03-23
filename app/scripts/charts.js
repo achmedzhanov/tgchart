@@ -265,7 +265,7 @@
                 return svgElBuilder;
             }
            
-            console.log('svgElC w h ', svgElC.el.offsetWidth, svgElC.el.offsetHeight);
+            //console.log('svgElC w h ', svgElC.el.offsetWidth, svgElC.el.offsetHeight);
 
             const viewPortBackdropEl = createEl('div')
             .style('left', viewPortPaddings.left + 'px')
