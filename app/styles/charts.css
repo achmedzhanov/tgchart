@@ -340,61 +340,43 @@ div.chart-y-line-text {
 
 /*  Desktops ##Screen = 1281px */
 @media (min-width: 1281px) {
-    .chart-container, .chart-container .chart-view-port {
-        width:75vw;
-    }
-    .chart-container .chart-view-port {
-        height:75vh;
+    .chart-container {
+        width:75%;
     }
 }
   
 /* Laptops, Desktops B/w 1025px to 1280px */
 @media (min-width: 1025px) and (max-width: 1280px) {
-    .chart-container, .chart-container .chart-view-port {
-        width:95vw;
-    }
-    .chart-container .chart-view-port {        
-        height:75vh;
+    .chart-container {
+        width:95%;
     }
 }
 
 /* Tablets, Ipads (portrait) B/w 768px to 1024px */
 @media (min-width: 768px) and (max-width: 1024px) {
-    .chart-container, .chart-container .chart-view-port {
-        width:95vw;
-    }
-    .chart-container .chart-view-port {        
-        height:95vw;
+    .chart-container {
+        width:95%;
     }
 }
 
 /* Tablets, Ipads (landscape) B/w 768px to 1024px */
 
 @media (min-width: 768px) and (max-width: 1024px) and (orientation: landscape) {
-    .chart-container, .chart-container .chart-view-port {
-        width:95vw;
-    }
-    .chart-container .chart-view-port {        
-        height:75vh;
+    .chart-container {
+        width:95%;
     }
 }
 
 /*  Low Resolution Tablets, Mobiles (Landscape) B/w 481px to 767px */
  @media (min-width: 481px) and (max-width: 767px) {
-    .chart-container, .chart-container .chart-view-port {
-        width:95vw;
-    }
-    .chart-container .chart-view-port {        
-        height:75vh;
+    .chart-container {
+        width:95%;
     }
  }
  
  /* Most of the Smartphones Mobiles (Portrait) Screen = B/w 320px to 479px  */
  @media (min-width: 320px) and (max-width: 480px) {
-    .chart-container, .chart-container .chart-view-port {
-        width:95vw;
-    }
-    .chart-container .chart-view-port {        
-        height:95vw;
+    .chart-container {
+        width:95%;
     }
  }
