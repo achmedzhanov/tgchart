@@ -5,6 +5,7 @@ body.day {
 body.night {
     background-color:  #242f3e;
     color: #ffffff;
+    /*transition: background-color .15s linear;*/
 }
 
 .chart-container svg text{
@@ -255,7 +256,7 @@ div.chart-y-line-text {
     font-family: system-ui, sans-serif;
     /*font-size: 1rem;*/
     font-weight: 600;
-    line-height: 1.2;
+    /*line-height: 1.2;*/
     white-space: nowrap;
     text-decoration: none;
     line-height: 2.5rem;
@@ -284,4 +285,31 @@ div.chart-y-line-text {
 
 .night .chart-toggle-buttons .toggle-button .circle-figure .checkmark {
     fill: #242f3e;
+}
+
+.mode-switcher-button {
+    margin:0 auto;
+    display:block;
+
+    color: #108be3;
+    border: 0;
+    border-radius: 0;
+    
+    background:transparent;
+    font-size: 1rem;
+    font-family: system-ui, sans-serif;
+    font-weight: normal;
+    /*line-height: 1.2;*/
+    white-space: nowrap;
+    text-decoration: none;
+    line-height: 2.5rem;
+    height: 2.5rem;
+    cursor: pointer;    
+}
+
+.mode-switcher-button:focus {
+    outline:0;
+}
+.mode-switcher-button::-moz-focus-inner {
+    border: 0;
 }

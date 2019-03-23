@@ -23,5 +23,6 @@ onDocumentReady(() => {
                 sizes: {width: w, height: w / 2}
             });
         }
+        window.createModeSwitcher();
     });
 });

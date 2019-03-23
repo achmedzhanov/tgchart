@@ -1207,7 +1207,26 @@
         }
     }
 
+    const createModeSwitcher = () => {
+        const dayText = "Switch To Night Mode";
+        const nightText = "Switch To Day Mode";
+        const buttonEl = createEl('button').addClass('mode-switcher-button').innerText(dayText).appendTo(document.body);
+        let night = false;
+        const b = new ElementBuilder(document.body);
+        buttonEl.on('click', () => {
+            night = !night;
+            if(night) {
+                b.addClass('night');
+                buttonEl.innerText(nightText);
+            } else {
+                b.removeClass('night');
+                buttonEl.innerText(dayText);
+            }
+        })
+    }
+
     g.createChart = createChart;
+    g.createModeSwitcher = createModeSwitcher;
 
 })(window);
 
