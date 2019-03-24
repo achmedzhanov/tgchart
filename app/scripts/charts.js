@@ -21,6 +21,11 @@
         ];
     }
 
+    const mequals = (m1, m2) => {
+        return !!m1 && !!m2 && m1[0] === m2[0] && m1[1] === m2[1] && m1[2] === m2[2] 
+            && m1[3] === m2[3] && m1[4] === m2[4] && m1[5] === m2[5];
+    }
+
     const minverse = (m) => {
         let d = m[0] * m[3] - m[1] * m[2];
         return {
@@ -168,9 +173,53 @@
             return this;
         }
     
+        do(cb) {
+            if(cb) {
+                cb(this);
+            }
+            return this;
+        }
+
         get el() {
             return this._el;
         }
+    }
+
+    class BehaviorSubject {
+        constructor(initialValue) {
+            this.value = initialValue;
+            this.handlers = [];
+        }
+        subscribe(h, skipCurrent) {
+            !skipCurrent && h(this.value);
+            this.handlers.push(h);
+        }
+        next(v) {
+            this.value = v;
+            for(let h of this.handlers) {
+                h(v);
+            }
+        }
+        getValue() {
+            return this.value;
+        }
+    }
+
+    const bs = (initialValue) => {
+        const subject = new BehaviorSubject(initialValue);
+        const r = (h, skip) => {
+            subject.subscribe(h, skip);
+        };
+        r.next = (v) => subject.next(v);
+        r.subscribe = (h, skip) => subject.subscribe(h, skip);
+        r.getValue = () => subject.getValue();
+        return r;
+    };
+
+    const mapbs = (source, mapFn) => {
+        const subject = bs(mapFn(source.getValue()));
+        source.subscribe((v) => subject.next(mapFn(v)), true);
+        return subject;
     }
 
     let optimizedSVGTransformations = false;
@@ -182,7 +231,7 @@
    
     function createChart(options) {
         const {el, chartData, title} = options;
-        let {sizes} = options;
+        let {size} = options;
         const {columns, names, types, colors} = chartData;
         const chartColumnsIds = Object.keys(types).filter(t => types[t] !== 'x');
         const columnsMap = {};
@@ -226,57 +275,93 @@
             return [xMin, xMax, 0 /*yMin*/, yMax];
         };
 
+        const getSizeFromEl = (el) => {
+            const isLandscape = window.innerHeight > window.innerWidth;
+            const width = el.offsetWidth || 500;
+            let aspectRatio = 1;
+            if(window.innerHeight && window.innerWidth) {
+                aspectRatio = window.innerHeight / window.innerWidth * 0.7;
+            }
+
+            return {width: width, height: isLandscape ?  width : width * aspectRatio};
+        }
+        
+        const xAxisHeight = 20;
+        const viewPortPaddings = {left: 0, right: 0, top: 2, bottom: 2};
+        const calcSizes = (size) => {
+            const viewPortSize = { 
+                width: size.width - viewPortPaddings.left - viewPortPaddings.right, 
+                height: size.height - viewPortPaddings.top - viewPortPaddings.bottom - xAxisHeight
+            };            
+            const svgSize = { 
+                width: size.width, 
+                height: size.height
+            };
+            return {viewPortSize, svgSize};
+        }
+
+
         const init = () => {
             if(title) {
                 createEl('div').addClass('title').innerText(title).appendTo(el);
             }
             const svgElC = createEl('div').addClass('chart-view-port').style('position', 'relative').appendTo(el);
-            
-            const viewPortPaddings = {left: 0, right: 0, top: 2, bottom: 2};
-            const xAxisHeight = 20;
-            if(!sizes) {
-                sizes = {width: svgElC.el.offsetWidth || 500, height: svgElC.el.offsetHeight || 500}; 
+            if(!size) {
+                size = getSizeFromEl(el); 
             }
-            state.sizes = sizes;            
-            state.viewPortSizes = { 
-                width: sizes.width - viewPortPaddings.left - viewPortPaddings.right, 
-                height: sizes.height - viewPortPaddings.top - viewPortPaddings.bottom - xAxisHeight
-            };            
-            
+            state.size = size;            
+            const initialSizes = calcSizes(size);
+            // TODO remove sizes fields from state!
+            state.viewPortSize = initialSizes.viewPortSize;
+            state.svgSize = initialSizes.svgSize;
+
+            const sizes$ = bs(initialSizes);
+            const sizeViewPort$ = mapbs(sizes$, (s)=>s.viewPortSize);
+            window.addEventListener('resize', () => {
+                const updatedSizes = calcSizes(getSizeFromEl(el));
+                // console.log('resize', updatedSizes);
+                sizes$.next(updatedSizes);
+            });
+
+
             const fullBounds = getBounds(null);
             state.fullBounds = fullBounds;
             const [, , yMin, yMax] = fullBounds;
-            
-            const svgWidth = sizes.width;
-            const svgHeight = sizes.height + xAxisHeight;
-            const viewPortWidth = sizes.width;
-            const viewPortHeight = sizes.height;
 
             state.transformY = (y) => -(y - yMin) + yMax /* -yMin  */;    
             // see method vertMatrix
-            //TODO use same matrices for chart view port and axes!
+            //TODO use same matrixes for chart view port and axes!
 
-            const setSvgSizes = (svgElBuilder, w,h, p) => {
-                const vb = [-p.left, - p.top, w+ p.right, h+ p.bottom];
+            const sizeSVG = (svgElBuilder, s, p) => {
+                const w = s.width;
+                const h = s.height;
+                p = p || {left: 0, right: 0, top: 2, bottom: 2};
+                const vb = [-p.left, - p.top, w - (p.right ), h - (p.bottom)];
+                
                 svgElBuilder
-                .style('width', w + (p.left + p.right))
-                .style('height', h + (p.left + p.bottom))
+                .style('width', w)
+                .style('height', h)
                 .attr('viewBox', `${vb[0]} ${vb[1]} ${vb[2]} ${vb[3]}`);
                 return svgElBuilder;
             }
            
-            //console.log('svgElC w h ', svgElC.el.offsetWidth, svgElC.el.offsetHeight);
-
             const viewPortBackdropEl = createEl('div')
+            .do((b) => {
+                sizes$((s) => {
+                    b
+                    .style('width', s.viewPortSize.width + 'px')
+                    .style('height', s.viewPortSize.height + 'px');
+                })
+            })
             .style('left', viewPortPaddings.left + 'px')
             .style('top', viewPortPaddings.top + 'px')
-            .style('width', viewPortWidth + 'px')
-            .style('height', viewPortHeight + 'px')
             .style('position', 'absolute').appendTo(svgElC);
 
             const svgEl = createSVG('svg')
             .attr('zoom', 1);
-            setSvgSizes(svgEl, svgWidth, svgHeight, viewPortPaddings);
+            sizes$((s)=> {
+                sizeSVG(svgEl, s.svgSize, viewPortPaddings);
+            })
 
             // Y axis
             const yAxisG =  createSVG('g')
@@ -288,54 +373,57 @@
             //X axis
             const xAxisG =  createSVG('g')
             .addClass('animate-transform')
-            .appendTo(svgEl)
-            .attr('transform', 'translate(0, ' + (state.viewPortSizes.height + xAxisHeight * 0.8 ) + ')');
-            state.elements.xAxisG = xAxisG;            
+            .appendTo(svgEl);
+            sizes$((s) => xAxisG.attr('transform', 'translate(0, ' + (s.viewPortSize.height + xAxisHeight * 0.8 ) + ')'));
 
+            state.elements.xAxisG = xAxisG;            
+            
             const initialRange = {from: 50, to: 75};
 
             const cvp = new ChartViewPort({ 
                 containerEl: svgEl.el, 
                 chartData: chartData, 
-                sizes: state.viewPortSizes,
+                size$: sizeViewPort$,
                 range: initialRange
             });
             cvp.init();
             state.cvp = cvp;
-            
+
             this.viewPortEl = new ElementBuilder(options.viewPortEl);
             this.viewPort = options.viewPort;
 
             const cph = new ChartsTooltip({viewPortEl: cvp.linesGC.el, hoverContainerEl: cvp.hoverContainerG.el, 
-                viewPort: cvp, viewPortBackdropEl: viewPortBackdropEl.el, sizes: state.viewPortSizes});
+                viewPort: cvp, viewPortBackdropEl: viewPortBackdropEl.el, size$: sizeViewPort$});
             cph.init();
-            state.cph = cph;            
-
+            state.cph = cph;
 
             const xAxis = new XAxis({containerEl: xAxisG.el, xColumn: xColumn});
-            state.xAxis = xAxis;            
+            state.xAxis = xAxis;
 
-            const yAxis = new YAxis({containerGEl: yAxisG.el, containerDivEl: viewPortBackdropEl.el});
+            const yAxis = new YAxis({containerGEl: yAxisG.el, containerDivEl: viewPortBackdropEl.el, viewPort: cvp, size$: sizeViewPort$});
             state.yAxis = yAxis;
 
             cvp.onChangeTransformations = (({bounds, vm, hm}) => {
                 xAxis.updateRange(bounds, state, hm);
-                yAxis.updateRange(bounds, state, vm);
+                yAxis.updateRange(bounds, vm);
             });
             cvp.updateRange(initialRange, true);
            
             svgEl.appendTo(svgElC);
 
-            const miniMapHeight = 30;
-            const miniMapBlockEl = createEl('div').addClass('chart-range-selector').style('width', state.viewPortSizes.width + 'px').appendTo(el);
+            const miniMapViewPortHeight = 30;
+            const miniMapBlockEl = createEl('div').addClass('chart-range-selector').appendTo(el);
+            sizes$((s)=>miniMapBlockEl.style('width', s.viewPortSize.width + 'px'))
             const miniMapEl = createSVG('svg').appendTo(miniMapBlockEl);
             
-            setSvgSizes(miniMapEl, state.viewPortSizes.width, miniMapHeight, {left: 0, right: 0, top: 2, bottom: 2});
+            const minimapPaddings = {left: 0, right: 0, top: 2, bottom: 2};
+            const minimapSVGHeight = miniMapViewPortHeight + minimapPaddings.top + minimapPaddings.bottom;
+            sizes$((s) => sizeSVG(miniMapEl, {width: s.viewPortSize.width, height: minimapSVGHeight}, minimapPaddings));
 
             const miniCVP = new ChartViewPort({ 
                 containerEl: miniMapEl.el, 
                 chartData: chartData, 
-                sizes: { width: state.viewPortSizes.width, height: miniMapHeight},
+                size$: mapbs(sizeViewPort$, (s) => { return { width: s.width, height: miniMapViewPortHeight };} ),
                 strokeWidth: '1px',
                 range: {from: 0, to: 100}
             });
@@ -343,8 +431,13 @@
             state.miniCVP = miniCVP;
             miniCVP.updateRange({from: 0, to: 100}, true)
 
-            const minRangeWidth =  Math.max(2 / (xColumn.length - 1) * 100, (1 / state.viewPortSizes.width) * 100, 5);
-            const rangeSelector = new RangeSelector({range: initialRange, containerEl: miniMapBlockEl.el, minRangeWidth: minRangeWidth});
+            const minRangeWidth =  Math.max(2 / (xColumn.length - 1) * 100, (1 / state.viewPortSize.width) * 100, 5);
+            const rangeSelector = new RangeSelector({
+                range: initialRange, 
+                containerEl: miniMapBlockEl.el, 
+                minRangeWidth: minRangeWidth, 
+                width$: mapbs(sizeViewPort$, (s) => s.width)
+            });
             rangeSelector.init();
             rangeSelector.onRangeChanged = (r) => { cph.hide(); cvp.updateRange(r); };
 
@@ -375,12 +468,14 @@
             this.animationUidKey = 'chart-view-port-' + this.uid;
             this.el = new ElementBuilder(options.containerEl);
             this.chartData = options.chartData;
-            this.sizes = options.sizes;
+            this.size$ = options.size$;
+            this.size$((s) => this.updateSize(s), true);
+            this.size = this.size$.getValue();
             this.strokeWidth = options.strokeWidth || 2;
             this.disabled = {};
             this.visibleRange = options.range || {from: 0, to: 100};
 
-            if(!this.sizes) throw new 'Expected options.sizes';
+            if(!this.size$) throw new 'Expected options.size$';
 
             this.onChangeTransformations = ()=> {};
             this.commitMarkupB = () => this.commitMarkup();
@@ -457,10 +552,18 @@
             this.linesG = linesG;
         }
 
+        updateSize(s) {
+            if(!s.width || !s.height) throw 'Excpected {width, height}';
+            this.size = s;
+            this.markupState = null;
+            this.currentTransformations = null;
+            this.updateRange( this.visibleRange, true);
+        }
+
         vMatrix(bounds) {
             const fbyMax = this.fullBounds[3];
             const yMax = bounds[3];
-            let yScale = this.sizes.height / yMax;
+            let yScale = this.size.height / yMax;
             const m1 = [1,0,0,1,0, yMax * yScale], m2 = [1,0,0, yScale,0,0], m3 =[1,0,0,1,0,-fbyMax];
             const vt = mmul(m1, mmul(m2, m3));
             return vt;
@@ -468,7 +571,7 @@
         
         hMatrix(bounds) {
             const [xMin, xMax,] = bounds;
-            let xScale = this.sizes.width / (xMax - xMin);
+            let xScale = this.size.width / (xMax - xMin);
             const m2 = [xScale,0,0,1,0,0], m3 = [1,0,0,1, -xMin,0];
             const m = mmul(m2, m3);
             return m;
@@ -551,8 +654,8 @@
                 const oldBounds = this.currentTransformations ? this.currentTransformations.bounds : null; 
 
                 const [xMin, xMax, yMin, yMax] = newBounds;
-                let xScale = this.sizes.width / (xMax - xMin);
-                let yScale = this.sizes.height / yMax;
+                let xScale = this.size.width / (xMax - xMin);
+                let yScale = this.size.height / yMax;
                
                 if(!oldBounds || !this.markupState) {
                     this.requestCommit({xMin, xMax, yMin, yMax, xScale, yScale});
@@ -583,7 +686,7 @@
 
         vMatrixByScale(yScale) {
             const fbyMax = this.fullBounds[3];
-            const yMax = this.sizes.height / yScale;
+            const yMax = this.size.height / yScale;
             const m1 = [1,0,0,1,0, yMax * yScale], m2 = [1,0,0, yScale,0,0], m3 =[1,0,0,1,0,-fbyMax];
             const vt = mmul(m1, mmul(m2, m3));
             return vt;
@@ -641,7 +744,8 @@
             this.hoverContainerEl = new ElementBuilder(options.hoverContainerEl);
             this.viewPortBackdropEl = new ElementBuilder(options.viewPortBackdropEl);
             this.viewPort = options.viewPort;
-            this.sizes = options.sizes;
+            this.size$ = options.size$;
+            this.size$(()=>this.hide(), true);
             this.isCreatedElements = false;
             this.circleElementsMap = {};
             this.circleElements = [];
@@ -683,8 +787,9 @@
             }
             
 
-            this.lineEl = createSVG('path').attr('d', 'M0 0 L0 ' + (this.sizes.height)).attr('display', 'none')
+            this.lineEl = createSVG('path').attr('display', 'none')
             .addClass('chart-tooltip-line').appendTo(this.hoverContainerEl);
+            this.size$((s) => this.lineEl.attr('d', 'M0 0 L0 ' + (s.height)));
             
             for(let i = 0; i < this.viewPort.chartColumnsIds.length; i++) {
                 const lId = this.viewPort.chartColumnsIds[i];
@@ -756,7 +861,7 @@
             const baseX = pmulX(xPoint ,m);
             const tooltipRect = this.tooltipEl.el.getBoundingClientRect();
             const tooltipWidth = tooltipRect.width;
-            let tooltipPosX = limit(baseX - 10, 0, this.sizes.width - tooltipWidth);
+            let tooltipPosX = limit(baseX - 10, 0, this.size$.getValue().width - tooltipWidth);
 
             this.tooltipEl.style('left', tooltipPosX + 'px');
             this.tooltipEl.style('top', 0 + 'px');
@@ -836,7 +941,7 @@
             // todo check same xscale!
 
             // eval visible labels
-            const maxLabelInViewPort = Math.trunc(state.viewPortSizes.width / this.getLabelWidth ()); // todo some coef for padding
+            const maxLabelInViewPort = Math.trunc(state.viewPortSize.width / this.getLabelWidth ()); // todo some coef for padding
             const w = bounds[1] - bounds[0];
             const actualLabelInViewPort = w / xStep;
             const k = actualLabelInViewPort / maxLabelInViewPort;
@@ -867,26 +972,28 @@
         constructor(options) {
             const c = optimizedSVGTransformations ? options.containerGEl : options.containerDivEl;
             this.el = new ElementBuilder(c);
-
+            this.viewPort = options.viewPort;
+            this.size$ = options.size$;
             this.elementsCache = {};
             this.currentRangeKey = null;
             this.currentBounds = null;
         }
 
-        updateRange(bounds, state, vm) {
-            this.sizes = state.viewPortSizes;
-            this.transformY = state.transformY;
+        updateRange(bounds, vm) {
+            this.transformY = this.viewPort.transformY;
 
             const [,,yMin,yMax] = bounds;
             const rKey = this.rangeToKey(yMin,yMax);
-            if(this.currentRangeKey === rKey) return;
-            
+            if(this.currentRangeKey === rKey && mequals(vm, this.currentVM)) return;
+            this.forceUpdate = false;
+
             const lc = 5;
             if(!this.currentRangeKey) {
                 const newLines = this.calcYAxis(bounds, lc, vm);
                 const gridElements = this.createYGridLines(newLines, () => {});
                 this.elementsCache[rKey] = gridElements;
             } else {
+
                 const prevBounds = this.currentBounds;
                 {
                     // move and hide lines
@@ -910,7 +1017,6 @@
                     }, 0);
                 }
             }
-
             this.currentRangeKey = rKey;
             this.currentBounds = bounds;
             this.currentVM = vm;
@@ -950,7 +1056,7 @@
                 if(optimizedSVGTransformations) {
                     const lEl = createSVG('path')
                     .style('vector-effect', 'non-scaling-stroke')
-                    .attr('d',  'M0 0 L' + (this.sizes.width) +' 0')
+                    .attr('d',  'M0 0 L' + (this.size$.getValue().width) +' 0')
                     .attr('transform',  'matrix(1,0,0,1,0,' + y + ')')
                     .addClass('chart-y-line')
                     .addClass('animate-transform-opacity')
@@ -999,7 +1105,7 @@
                 
                 if(optimizedSVGTransformations) {
                     hGridLines[i]
-                    .attr('d',  'M0 0 L' + (this.sizes.width) +' 0')
+                    .attr('d',  'M0 0 L' + (this.size$.getValue().width) +' 0')
                     .attr('transform',  'matrix(1,0,0,1,0,' + y + ')');
                     cb(hGridLines[i]);
                     
@@ -1064,7 +1170,8 @@
     class RangeSelector {
         constructor(options) {
             this.range = options.range || {from:0,  to: 100};
-            this.width = options.width;
+            this.width$ = options.width$;
+            this.width$(() => this.positionByRange(), true);
             this.minRangeWidth = options.minRangeWidth || 5;
             this.el = new ElementBuilder(options.containerEl);
             this.onRangeChanged = () => {};
@@ -1075,9 +1182,6 @@
             this.leftGripperEl = createEl('div').addClass('left-gripper').appendTo(this.el);
             this.rightGripperEl = createEl('div').addClass('right-gripper').appendTo(this.el);
             this.sliderEl = createEl('div').addClass('slider').appendTo(this.el);
-
-            // use pointer events???
-
             this.sliderEl.on('pointerdown', (e) => this.onSliderMouseDown(e));
             this.leftGripperEl.on('pointerdown', (e) => this.onLeftGripperMouseDown(e));
             this.rightGripperEl.on('pointerdown', (e) => this.onRightGripperMouseDown(e));
@@ -1102,7 +1206,6 @@
             const rightPos = this.state.rightPos;
             const w = this.state.w;
             const width = rightPos - leftPos;
-            
             this.sliderEl.style('left', leftPos + 'px');
             this.sliderEl.style('width', width + 'px');
             this.leftGripperEl.style('left', leftPos + 'px');
@@ -1111,7 +1214,8 @@
             this.rightCurtainEl.style('width', (w - rightPos) + 'px');
         }        
         getWidth() {
-            if(this.width) return this.width;
+            const w = this.width$.getValue();
+            if(w) return w;
             return this.width = this.el.el.getBoundingClientRect().width;
         }
         cloneState() {
