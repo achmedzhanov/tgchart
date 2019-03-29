@@ -692,6 +692,10 @@
             return vt;
         }        
 
+        equalP(x1, x2) {
+            return Math.round((x1 - x2) * 1000000) < 1;
+        }
+
         commitMarkup() {
             const {xMin, yScale, xScale} =  this.markupState;
             if(xMin === undefined) throw 'xMin';
@@ -700,8 +704,8 @@
 
             //console.log('cimmit yScale', yScale);
 
-            const commitedMarkeupState = this.commitedMarkupState
-            if(!commitedMarkeupState || yScale != commitedMarkeupState.yScale || xScale != commitedMarkeupState.xScale) {
+            const commitedMarkupState = this.commitedMarkupState
+            if(!commitedMarkupState || yScale != commitedMarkupState.yScale || !this.equalP(xScale, commitedMarkupState.xScale)) {
                 const vm  = this.vMatrixByScale(yScale);
                 const visibleLinesIds = this.getAllLinesIds();
                 for (let lId of visibleLinesIds) {
@@ -718,7 +722,7 @@
                 }                
             }
             this.linesG.attr('transform', 'translate(' + -xMin * xScale + ', 0)');
-            this.commitedMarkeupState = this.markupState;
+            this.commitedMarkupState = this.markupState;
         }
 
         toggleLine(lId)  {
