@@ -228,6 +228,17 @@
     const createEl = (type) => new ElementBuilder(document.createElement(type));
 
     const xStep = 20;
+
+    const roundRange = (y) => {
+        const k =1000;
+        if (y<1) {
+            return 1;
+        }
+        let numbers = Math.ceil(Math.log(Math.abs(y) + 0.5) / Math.log(10));
+        let scaled = y / (10 ** numbers) * k;
+        scaled = Math.ceil(scaled);
+        return scaled / k * (10 ** numbers);
+    }
    
     function createChart(options) {
         const {el, chartData, title} = options;
@@ -272,7 +283,7 @@
             const xMin = xSize * s.visibleRange.from / 100;
             const xMax = xSize * s.visibleRange.to / 100;
 
-            return [xMin, xMax, 0 /*yMin*/, yMax];
+            return [xMin, xMax, 0 /*yMin*/, roundRange(yMax)];
         };
 
         const getSizeFromEl = (el) => {
@@ -611,7 +622,7 @@
             const xMin = xSize * range.from / 100;
             const xMax = xSize * range.to / 100;
 
-            return [xMin, xMax, 0 /*yMin*/, yMax];
+            return [xMin, xMax, 0 /*yMin*/, roundRange(yMax)];
         }
 
         requestUpdate(u) {
@@ -987,6 +998,7 @@
             this.transformY = this.viewPort.transformY;
 
             const [,,yMin,yMax] = bounds;
+
             const rKey = this.rangeToKey(yMin,yMax);
             if(this.currentRangeKey === rKey && mequals(vm, this.currentVM)) return;
             this.forceUpdate = false;
@@ -1012,7 +1024,7 @@
                 {
                     const newLines = this.calcYAxis(bounds, lc, this.currentVM);
                     // TODO get elements from cache!
-                    const gridElements = this.elementsCache[this.rKey] || 
+                    const gridElements = this.elementsCache[rKey] || 
                         this.createYGridLines(newLines, (el) => el.style('opacity', '0'));
                     const movedLines = this.calcYAxis(bounds, lc, vm);
                     this.elementsCache[rKey] = gridElements;
@@ -1049,7 +1061,6 @@
         }        
 
         createYGridLines(lines, cb) {
-            
             const hGridLines = [];
             const hGridTexts = [];
             
