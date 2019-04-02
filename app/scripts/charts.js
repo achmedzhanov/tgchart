@@ -648,7 +648,7 @@
         }
 
         updateRange(range, force) {
-            
+            //console.log('update range', range.from, range.to);
             range = range || {from: 0, to: 100};
             if(this.visibleRange.from == range.from && this.visibleRange.to == range.to && !force) return;
             this.visibleRange = range;
@@ -663,8 +663,8 @@
                 this.linesG.attr('transform', a2m(hm));
             } else {
                 const oldBounds = this.currentTransformations ? this.currentTransformations.bounds : null; 
-
                 const [xMin, xMax, yMin, yMax] = newBounds;
+                //console.log('xMin, xMax', xMin, xMax);
                 let xScale = this.size.width / (xMax - xMin);
                 let yScale = this.size.height / yMax;
                
@@ -704,7 +704,7 @@
         }        
 
         equalP(x1, x2) {
-            return Math.round((x1 - x2) * 1000000) < 1;
+            return Math.round(Math.abs(x1 - x2) * 1000000) < 1;
         }
 
         commitMarkup() {
@@ -713,9 +713,7 @@
             if(xScale === undefined) throw 'xScale';
             if(yScale === undefined) throw 'yScale';
 
-            //console.log('cimmit yScale', yScale);
-
-            const commitedMarkupState = this.commitedMarkupState
+            const commitedMarkupState = this.commitedMarkupState;
             if(!commitedMarkupState || yScale != commitedMarkupState.yScale || !this.equalP(xScale, commitedMarkupState.xScale)) {
                 const vm  = this.vMatrixByScale(yScale);
                 const visibleLinesIds = this.getAllLinesIds();
@@ -730,10 +728,11 @@
                         d += pmulY(this.transformY(c[pIdx]), vm);
                     }
                     this.linesElements[lId].attr('d', d);
-                }                
+                }
+                //console.log('commit -->');
+                this.commitedMarkupState = this.markupState;
             }
             this.linesG.attr('transform', 'translate(' + -xMin * xScale + ', 0)');
-            this.commitedMarkupState = this.markupState;
         }
 
         toggleLine(lId)  {
