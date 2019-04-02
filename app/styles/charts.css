@@ -174,8 +174,12 @@ div.chart-y-line {
     position: absolute;
     left: 0px;
     transition: 0.3s linear;
-    transition-property: top, opacity;
+    transition-property: top, opacity, color, c;
     z-index: -1;
+}
+
+div.chart-y-line.hide {
+    border-color: #fff;
 }
 
 .night div.chart-y-line-text {
@@ -190,10 +194,13 @@ div.chart-y-line-text {
     left: 0px;
     margin-top: -12px;
     transition: 0.3s linear;
-    transition-property: top, opacity;
+    transition-property: top, opacity, color;
     z-index: -1;
 }
 
+div.chart-y-line-text.hide {
+    color: #fff;
+}
 
 /* --------- */
 
