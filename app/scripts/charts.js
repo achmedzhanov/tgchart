@@ -1005,7 +1005,7 @@
                     //const newLines = this.calcYAxis(bounds, lc);
                     const newLines = this.calcYAxis(prevBounds, lc, vm);
                     q(() => {
-                        this.updateYGridLines(gridElements, newLines, (el) => el.addClass('hide') /*.style('opacity', '0')*/);
+                        this.updateYGridLines(gridElements, newLines, (el) => el.style('opacity', '0'));
                         //this.updateYGridLines(gridElements, newLines, () => {});
                     }, 0);
                 }
@@ -1013,11 +1013,11 @@
                     const newLines = this.calcYAxis(bounds, lc, this.currentVM);
                     // TODO get elements from cache!
                     const gridElements = this.elementsCache[this.rKey] || 
-                        this.createYGridLines(newLines, (el) => el.addClass('hide') /*.style('opacity', '0')*/);
+                        this.createYGridLines(newLines, (el) => el.style('opacity', '0'));
                     const movedLines = this.calcYAxis(bounds, lc, vm);
                     this.elementsCache[rKey] = gridElements;
                     q(() => {
-                    this.updateYGridLines(gridElements, movedLines, (el) => el.addClass('hide').removeClass('hide') /*.style('opacity', '1')*/);
+                    this.updateYGridLines(gridElements, movedLines, (el) => el.style('opacity', '1'));
                     }, 0);
                 }
             }
