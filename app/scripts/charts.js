@@ -1184,20 +1184,22 @@
             fireDndEvent(mme, true);
             finish();
         };
-        const onTouchMove = (mme) => {
+        const preventTouchScroll = (mme) => {
             if(finished) return;
-            mme.preventDefault();
+            if(mme.cancelable) mme.preventDefault();
         };        
         let finished = false;
         const finish = () => {
             finished = true;
             document.removeEventListener('pointermove', onMouseMove);
             document.removeEventListener('pointerup', onMouseUp);
-            document.removeEventListener('touchmove', onTouchMove);
+            document.removeEventListener('touchmove', preventTouchScroll);
+            // document.removeEventListener('touchstart', preventTouchScroll);
         };
         document.addEventListener('pointermove', onMouseMove);
         document.addEventListener('pointerup', onMouseUp);
-        document.addEventListener('touchmove', onTouchMove, { passive:false });
+        document.addEventListener('touchmove', preventTouchScroll, { passive:false });
+        // document.addEventListener('touchstart', preventTouchScroll, { passive:false });
     }
 
     function limit(v, min, max) {
