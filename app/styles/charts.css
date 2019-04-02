@@ -223,11 +223,32 @@ div.chart-y-line-text {
     border-bottom:  1px solid rgba(221, 234, 243, .75);
     box-sizing: border-box;
     z-index: 2;
+    touch-action: none;
 }
 
 .night .chart-range-selector .left-gripper, .night .chart-range-selector .right-gripper {
     background-color: rgba(64, 86, 107, .5);
 }
+
+.left-gripper::after {
+    content: ' ';
+    display: block;
+    margin-left: -5px;
+    width: 10px;
+    height: 100%;
+    opacity: 0;
+}
+
+.right-gripper::after {
+    content: ' ';
+    display: block;
+    margin-right: -5px;
+    width: 10px;
+    height: 100%;
+    opacity: 0;
+}
+
+
 
 .chart-range-selector .left-gripper, .chart-range-selector .right-gripper {
     position: absolute;
