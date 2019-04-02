@@ -175,6 +175,8 @@ div.chart-y-line {
     left: 0px;
     transition: 0.3s linear;
     transition-property: top, opacity;
+    will-change: top, opacity;
+    transform: translateZ(0);
     z-index: -1;
 }
 
@@ -191,6 +193,8 @@ div.chart-y-line-text {
     margin-top: -12px;
     transition: 0.3s linear;
     transition-property: top, opacity;
+    will-change: top, opacity;
+    transform: translateZ(0);
     z-index: -1;
 }
 
