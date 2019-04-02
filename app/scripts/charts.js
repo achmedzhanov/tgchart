@@ -1184,14 +1184,20 @@
             fireDndEvent(mme, true);
             finish();
         };
+        const onTouchMove = (mme) => {
+            if(finished) return;
+            mme.preventDefault();
+        };        
         let finished = false;
         const finish = () => {
             finished = true;
             document.removeEventListener('pointermove', onMouseMove);
             document.removeEventListener('pointerup', onMouseUp);
+            document.removeEventListener('touchmove', onTouchMove);
         };
         document.addEventListener('pointermove', onMouseMove);
         document.addEventListener('pointerup', onMouseUp);
+        document.addEventListener('touchmove', onTouchMove, { passive:false });
     }
 
     function limit(v, min, max) {
