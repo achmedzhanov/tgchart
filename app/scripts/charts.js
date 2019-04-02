@@ -61,6 +61,17 @@
 
     const q = (cb)=> setTimeout(cb,0); 
 
+    const getWindowSize = () => {
+        const width = window.innerWidth
+        || document.documentElement.clientWidth
+        || document.body.clientWidth;
+        
+        const height = window.innerHeight
+        || document.documentElement.clientHeight
+        || document.body.clientHeight;        
+        return {width, height};
+    }
+
     // function throttle (cb, duration) {
     //     let wait = false;
     //     return function () {
@@ -328,7 +339,15 @@
 
             const sizes$ = bs(initialSizes);
             const sizeViewPort$ = mapbs(sizes$, (s)=>s.viewPortSize);
+            let prevWindowSize = getWindowSize();
             window.addEventListener('resize', () => {
+                const actualWindowSize = getWindowSize();
+                if(actualWindowSize.width == prevWindowSize.width) { 
+                    if(Math.min(actualWindowSize.height, prevWindowSize.height) / Math.max(actualWindowSize.height, prevWindowSize.height) > 0.9)
+                        return; 
+                }
+                prevWindowSize = actualWindowSize;
+
                 const updatedSizes = calcSizes(getSizeFromEl(el));
                 // console.log('resize', updatedSizes);
                 sizes$.next(updatedSizes);
