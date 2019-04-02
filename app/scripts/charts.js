@@ -120,31 +120,6 @@
         if(key) animationsMap[key] = rId;
     }
 
-    const _requestUpdateHandlers = [];
-
-    const requestUpdate = (u) => {
-        // if(this.lastUpdate) { 
-        //     console.log('requestUpdate/cancelAnimationFrame'); 
-        //     cancelAnimationFrame(this.lastUpdate); 
-        //     this.lastUpdate = null;
-        // }
-
-        // TODO spawn render from setTimeout(1000/6), not raf
-
-        _requestUpdateHandlers.push(u);
-
-        /*this.lastUpdate =*/ requestAnimationFrame(() => {
-            //console.log('requestUpdate/update', performance.now()); 
-            while(_requestUpdateHandlers.length>0) {
-                const u = _requestUpdateHandlers.shift();
-                u();
-            }
-            /*this.lastUpdate = null;*/
-        });
-    }    
-
-    const isWebkit = "webkitLineBreak" in document.documentElement.style;
-
     class ElementBuilder {
         constructor(el) {
             this._el = el;
@@ -429,10 +404,8 @@
             state.yAxis = yAxis;
 
             cvp.onChangeTransformations = (({bounds, vm, hm}) => {
-                requestUpdate(() => {
-                    xAxis.updateRange(bounds, state, hm);
-                    yAxis.updateRange(bounds, vm);
-                });
+                xAxis.updateRange(bounds, state, hm);
+                yAxis.updateRange(bounds, vm);
             });
             cvp.updateRange(initialRange, true);
            
@@ -641,11 +614,26 @@
             return [xMin, xMax, 0 /*yMin*/, yMax];
         }
 
+        requestUpdate(u) {
+            // if(this.lastUpdate) { 
+            //     console.log('requestUpdate/cancelAnimationFrame'); 
+            //     cancelAnimationFrame(this.lastUpdate); 
+            //     this.lastUpdate = null;
+            // }
+
+            // TODO spawn render from setTimeout(1000/6), not raf
+
+            this.lastUpdate = requestAnimationFrame(() => {
+                //console.log('requestUpdate/update', performance.now()); 
+                u();
+                this.lastUpdate = null;
+            });
+        }
 
         requestCommit(s) {
             //console.log('request yScale', s.yScale);
             this.markupState = s;
-            requestUpdate(this.commitMarkupB);
+            this.requestUpdate(this.commitMarkupB);
         }
 
         updateRange(range, force) {
@@ -677,7 +665,6 @@
                             
                             // TODO adapt duration to scale difference
                             const duration = 200; 
-                            //const duration = 1; 
                             animateSteps({
                                 key: this.animationUidKey, 
                                 range: {from: this.markupState.yScale, to: yScale}, 
@@ -987,8 +974,7 @@
     class YAxis {
         
         constructor(options) {
-            this.supportedSvgAnimation = isWebkit;
-            const c = this.supportedSvgAnimation ? options.containerGEl : options.containerDivEl;
+            const c = optimizedSVGTransformations ? options.containerGEl : options.containerDivEl;
             this.el = new ElementBuilder(c);
             this.viewPort = options.viewPort;
             this.size$ = options.size$;
@@ -1018,7 +1004,7 @@
                     const gridElements = this.elementsCache[this.currentRangeKey];
                     //const newLines = this.calcYAxis(bounds, lc);
                     const newLines = this.calcYAxis(prevBounds, lc, vm);
-                    requestUpdate(() => {
+                    q(() => {
                         this.updateYGridLines(gridElements, newLines, (el) => el.style('opacity', '0'));
                         //this.updateYGridLines(gridElements, newLines, () => {});
                     }, 0);
@@ -1030,7 +1016,7 @@
                         this.createYGridLines(newLines, (el) => el.style('opacity', '0'));
                     const movedLines = this.calcYAxis(bounds, lc, vm);
                     this.elementsCache[rKey] = gridElements;
-                    requestUpdate(() => {
+                    q(() => {
                     this.updateYGridLines(gridElements, movedLines, (el) => el.style('opacity', '1'));
                     }, 0);
                 }
@@ -1071,7 +1057,7 @@
             for(let i = 0;i < lc;i++) {
                 let y = lines[i].y;
                 
-                if(this.supportedSvgAnimation) {
+                if(optimizedSVGTransformations) {
                     const lEl = createSVG('path')
                     .style('vector-effect', 'non-scaling-stroke')
                     .attr('d',  'M0 0 L' + (this.size$.getValue().width) +' 0')
@@ -1121,24 +1107,24 @@
             for(let i = 0; i < lc; i++) {
                 let y = lines[i].y;
                 
-                if(this.supportedSvgAnimation) {
-                    cb(hGridLines[i]);
+                if(optimizedSVGTransformations) {
                     hGridLines[i]
                     .attr('d',  'M0 0 L' + (this.size$.getValue().width) +' 0')
                     .attr('transform',  'matrix(1,0,0,1,0,' + y + ')');
+                    cb(hGridLines[i]);
                     
-                    cb(hGridTexts[i]);
                     hGridTexts[i]
                     //.textContent('' + lines[i].text)
                     .attr('transform',  'matrix(1,0,0,1,0,' + (y - 5) + ')');
+                    cb(hGridTexts[i]);
                 } else {
-                    cb(hGridLines[i]);
                     hGridLines[i]
                     .style('top',  y + 'px')
+                    cb(hGridLines[i]);
                     
-                    cb(hGridTexts[i]);
                     hGridTexts[i]
                     .style('top',  y + 'px')
+                    cb(hGridTexts[i]);
                 }
             }     
         }        
