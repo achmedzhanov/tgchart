@@ -324,12 +324,12 @@ div.chart-y-line-text {
 }
 
 .chart-toggle-buttons .toggle-button .circle-figure .checkmark {
-    margin-bottom: -2px;
-    fill: #fff;
+    margin-bottom: -1px;
+    stroke: #fff;
 }
 
 .night .chart-toggle-buttons .toggle-button .circle-figure .checkmark {
-    fill: #242f3e;
+    stroke: #242f3e;
 }
 
 .mode-switcher-button {
