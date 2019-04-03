@@ -320,14 +320,14 @@ div.chart-y-line-text {
     line-height: 24px;
     margin-right: 0.5rem;
     border-radius: 1000px;
-    border: 2px solid red;
+    border: 0px;
     box-sizing: border-box;
     transition: 0.3s ease-in;
     transition-property: box-shadow;
 }
 
 .chart-toggle-buttons .toggle-button .circle-figure .checkmark {
-    margin-bottom: -1px;
+    margin-bottom: -2px;
     stroke: #fff;
 }
 
