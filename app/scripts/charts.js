@@ -1039,9 +1039,9 @@
                     //console.log('# update position');
                     const gridElements = this.elementsCache[this.currentRangeKey];
                     const newLines = this.calcYAxis(prevBounds, vm);
-                    q(() => {
+                    //q(() => {
                             this.updateYGridLines(gridElements, newLines, () => {});
-                    }, 0);
+                    //}, 0);
                 } else {
                     //console.log('# swap labels', this.currentRangeKey, rKey);
                     {
