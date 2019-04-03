@@ -173,7 +173,7 @@ div.chart-y-line {
     height: 0px;
     position: absolute;
     left: 0px;
-    transition: 0.3s ease-in;
+    transition: 0.2s ease-in;
     transition-property: top, opacity;
     z-index: -1;
 }
@@ -189,7 +189,7 @@ div.chart-y-line-text {
     position: absolute;
     left: 0px;
     margin-top: -12px;
-    transition: 0.3s ease-in;
+    transition: 0.2s ease-in;
     transition-property: top, opacity;
     z-index: -1;
 }

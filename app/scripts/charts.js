@@ -240,8 +240,7 @@
 
     const xStep = 20;
 
-    const roundRange = (y) => {
-        const k =1000;
+    const roundRange = (y, k) => {
         if (y<1) {
             return 1;
         }
@@ -249,8 +248,12 @@
         let scaled = y / (10 ** numbers) * k;
         scaled = Math.ceil(scaled);
         return scaled / k * (10 ** numbers);
+    }    
+
+    const round1000Range = (y) => {
+        return roundRange(y, 1000);
     }
-   
+
     function createChart(options) {
         const {el, chartData, title} = options;
         let {size} = options;
@@ -294,7 +297,7 @@
             const xMin = xSize * s.visibleRange.from / 100;
             const xMax = xSize * s.visibleRange.to / 100;
 
-            return [xMin, xMax, 0 /*yMin*/, roundRange(yMax)];
+            return [xMin, xMax, 0 /*yMin*/, round1000Range(yMax)];
         };
 
         const getSizeFromEl = (el) => {
@@ -641,7 +644,7 @@
             const xMin = xSize * range.from / 100;
             const xMax = xSize * range.to / 100;
 
-            return [xMin, xMax, 0 /*yMin*/, roundRange(yMax)];
+            return [xMin, xMax, 0 /*yMin*/, round1000Range(yMax)];
         }
 
         requestUpdate(u) {
@@ -1012,47 +1015,57 @@
             this.currentBounds = null;
         }
 
-        updateRange(bounds, vm) {
+        updateRange(viewPortBounds, vm) {
             this.transformY = this.viewPort.transformY;
 
-            const [,,yMin,yMax] = bounds;
+            //let [,,yMin,yMax] = viewPortBounds;
+            const labelsBounds = [viewPortBounds[0],viewPortBounds[1], viewPortBounds[2], this.prettyLabelsRange(viewPortBounds[3])];
 
-            const rKey = this.rangeToKey(yMin,yMax);
+            //console.log('prettyLabelsRange', viewPortBounds[3], this.prettyLabelsRange(viewPortBounds[3]));
+
+            const rKey = this.rangeToKey(labelsBounds[2],labelsBounds[3]);
+            
             if(this.currentRangeKey === rKey && mequals(vm, this.currentVM)) return;
             this.forceUpdate = false;
 
-            const lc = 5;
             if(!this.currentRangeKey) {
-                const newLines = this.calcYAxis(bounds, lc, vm);
+                const newLines = this.calcYAxis(labelsBounds, vm);
                 const gridElements = this.createYGridLines(newLines, () => {});
                 this.elementsCache[rKey] = gridElements;
             } else {
-
                 const prevBounds = this.currentBounds;
-                {
-                    // move and hide lines
+
+                if(this.currentRangeKey == rKey) {
+                    //console.log('# update position');
                     const gridElements = this.elementsCache[this.currentRangeKey];
-                    //const newLines = this.calcYAxis(bounds, lc);
-                    const newLines = this.calcYAxis(prevBounds, lc, vm);
+                    const newLines = this.calcYAxis(prevBounds, vm);
                     q(() => {
-                        this.updateYGridLines(gridElements, newLines, (el) => el.style('opacity', '0'));
-                        //this.updateYGridLines(gridElements, newLines, () => {});
+                            this.updateYGridLines(gridElements, newLines, () => {});
                     }, 0);
-                }
-                {
-                    const newLines = this.calcYAxis(bounds, lc, this.currentVM);
-                    // TODO get elements from cache!
-                    const gridElements = this.elementsCache[rKey] || 
-                        this.createYGridLines(newLines, (el) => el.style('opacity', '0'));
-                    const movedLines = this.calcYAxis(bounds, lc, vm);
-                    this.elementsCache[rKey] = gridElements;
-                    q(() => {
-                    this.updateYGridLines(gridElements, movedLines, (el) => el.style('opacity', '1'));
-                    }, 0);
+                } else {
+                    //console.log('# swap labels', this.currentRangeKey, rKey);
+                    {
+                        // move and hide lines
+                        const gridElements = this.elementsCache[this.currentRangeKey];
+                        const newLines = this.calcYAxis(prevBounds, vm);
+                        q(() => {
+                            this.updateYGridLines(gridElements, newLines, (el) => el.style('opacity', '0'));
+                        }, 0);
+                    }
+                    {
+                        const newLines = this.calcYAxis(labelsBounds, this.currentVM);
+                        const gridElements = this.elementsCache[rKey] || 
+                            this.createYGridLines(newLines, (el) => el.style('opacity', '0'));
+                        const movedLines = this.calcYAxis(labelsBounds, vm);
+                        this.elementsCache[rKey] = gridElements;
+                        q(() => {
+                        this.updateYGridLines(gridElements, movedLines, (el) => el.style('opacity', '1'));
+                        }, 0);
+                    }
                 }
             }
             this.currentRangeKey = rKey;
-            this.currentBounds = bounds;
+            this.currentBounds = labelsBounds;
             this.currentVM = vm;
         }
 
@@ -1060,16 +1073,31 @@
             return yMin + ':' + yMax;
         }
 
+        prettyLabelsRange(yMax) {
+            const kk = [10, 20, 25, 50, 100];
+            for(let step = 0; step < 2; step ++) {
+                const base = step == 0 ? yMax / 6 * 5 : yMax / 6.1 * 5;
+                for(let i = 0; i< kk.length; i++) {
+                    const t = roundRange(base, kk[i]);
+                    if(t < yMax * 0.9) return t;
+                }
+            }
+
+            return yMax / 6 * 5;
+        }
+
         prettyY(y) {
             return Math.round(y);
         }
 
-        calcYAxis(bounds, lc, vm) {
+        calcYAxis(bounds, vm) {
+            const lc = 5;
+
             const [, , yMin, yMax] = bounds;
             const lines = [];
 
             for(let i = 0;i<=lc;i++) {
-                let yPoint = (yMax - yMin) / (lc + 1) * i;
+                let yPoint = (yMax - yMin) / (lc) * i;
                 yPoint = this.prettyY(yPoint);
                 const y = pmulY(this.transformY(yPoint), vm);
                 lines.push({y: y, yGraph: yPoint, text: yPoint});
