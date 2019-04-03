@@ -1360,7 +1360,7 @@
                 .addClass('toggled')
                 .appendTo(this.el);
                 const cfEl = createEl('div').addClass('circle-figure').innerHTML(checkmark).appendTo(bEl);
-                cfEl.style('border-color', this.colors[k]).style('background-color', this.colors[k]);
+                cfEl.style('border-color', this.colors[k]).style('box-shadow', 'inset 0px 0px 0px 11px ' + this.colors[k]);
                 
                 const span = createEl('span').appendTo(bEl);                
                 span.innerText(n);
@@ -1368,10 +1368,12 @@
                 bEl.el.onclick = () => {
                     toggled = !toggled;
                     if(toggled) {
-                        cfEl.style('background-color', this.colors[k]);
+                        //cfEl.style('background-color', this.colors[k]);
+                        cfEl.style('box-shadow', 'inset 0px 0px 0px 11px ' + this.colors[k])
                         bEl.addClass('toggled');
                     } else {
-                        cfEl.style('background-color', 'transparent');
+                        //cfEl.style('background-color', 'transparent');
+                        cfEl.style('box-shadow', 'inset 0px 0px 0px 0px ' + this.colors[k])
                         bEl.removeClass('toggled');
                     }
 
