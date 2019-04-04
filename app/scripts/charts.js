@@ -91,7 +91,7 @@
         }
     }
 
-    // const linear = (t) => t;
+    //const linear = (t) => t;
     const easeInQuad = function (t) { return t*t };
     const animationsMap = {};
     //let aIdSource = 0;
@@ -105,10 +105,31 @@
         //console.log('animate/new' + '\t\t\t\t#' + aId );
         if(key && animationsMap[key]) {
             //console.log('animate/cancel' + '\t\t\t\t#' + aId );
-            cancelAnimationFrame(animationsMap[key]);
-            onCancel && onCancel();
+            cancelAnimationFrame(animationsMap[key].rId);
+            
+            const pas = animationsMap[key];
+            let p = (new Date() - pas.startTime) / pas.duration;
+            if(p >= 1) p = 1;
+            //console.log('\tanimate/if' + '\t\t\t#' + aId , p);
+            const continuedV = pas.range.from + (pas.range.to - pas.range.from) * pas.ease(p);
+            //console.log('continued value',v, ' vs', range.from);
+            
+            if(Math.abs(range.to - continuedV)  < Math.abs(range.to - range.from)) {
+                //console.log('replace.from', range.from, '===>', continuedV);
+                // callback should be here let suggestedV =  onCancel(from, to, current); if(suggestedV !== undefined) ... 
+                range.from = continuedV;
+            }
+            
+            onCancel && onCancel(continuedV);
+
             animationsMap[key] = undefined;
         }
+
+        if(duration == 10) {
+            onFinish && onFinish(range.to);
+            return;
+        }
+
         // TODO use performnce.now instead of new Date ???
         let startTime = new Date();
         const a = () => {
@@ -124,11 +145,11 @@
                 //console.log('\t\tanimate/step' + '\t#' + aId , p);
                 step(v);
                 const rId = requestAnimationFrame(a);
-                if(key) animationsMap[key] = rId;
+                if(key) animationsMap[key].rId = rId;
             }
         };
         const rId = requestAnimationFrame(a);
-        if(key) animationsMap[key] = rId;
+        if(key) animationsMap[key] = {rId, ease, range, duration, startTime};
     }
 
     class ElementBuilder {
@@ -656,6 +677,8 @@
 
             // TODO spawn render from setTimeout(1000/6), not raf
 
+            // TODO RAF with overriding U, no cancel, no many requests!
+
             this.lastUpdate = requestAnimationFrame(() => {
                 //console.log('requestUpdate/update', performance.now()); 
                 u();
@@ -663,10 +686,14 @@
             });
         }
 
-        requestCommit(s) {
+        requestCommit(s, force) {
             //console.log('request yScale', s.yScale);
             this.markupState = s;
-            this.requestUpdate(this.commitMarkupB);
+            if(force) {
+                this.commitMarkup();
+            } else {
+                this.requestUpdate(this.commitMarkupB);
+            }
         }
 
         updateRange(range, force) {
@@ -697,16 +724,26 @@
                         this.currentTransformations.bounds[3] != newBounds[3]) {
                             
                             // TODO adapt duration to scale difference
-                            const duration = 200; 
-                            animateSteps({
-                                key: this.animationUidKey, 
-                                range: {from: this.markupState.yScale, to: yScale}, 
-                                duration: duration, step: (yScale)=> {
-                                    this.requestCommit({...this.markupState, yScale});
-                                }, onFinish: (yScale)=> {
-                                    this.requestCommit({...this.markupState, yScale});
-                                } 
-                            });                            
+                            const changeK = Math.min(this.markupState.yScale, yScale) / Math.max(this.markupState.yScale, yScale);
+                            //console.log('coef', changeK);
+                            // if(Math.min(this.markupState.yScale, yScale) / Math.max(this.markupState.yScale, yScale) > 0.95) {
+                                //     this.requestCommit({...this.markupState, yScale});
+                                // } else {
+                                
+                                const duration = changeK < 0.95 ? 200: 10;
+                                animateSteps({
+                                    key: this.animationUidKey, 
+                                    range: {from: this.markupState.yScale, to: yScale}, 
+                                    duration: duration, step: (yScale)=> {
+                                        //console.log('step Y', yScale, performance.now());
+                                        this.requestCommit({...this.markupState, yScale}, true);
+                                    }, onFinish: (yScale)=> {
+                                        this.requestCommit({...this.markupState, yScale}, true);
+                                    }, onCancel:  (yScale)=> {
+                                        this.requestCommit({...this.markupState, yScale});
+                                    }
+                                }); 
+                            //}
                     } 
                     
                     this.requestCommit({...this.markupState, xMin, xMax, xScale});
@@ -975,7 +1012,8 @@
             }
 
             // todo check same xscale!
-
+   	    requestAnimationFrame(() => { 	    
+   
             // eval visible labels
             const maxLabelInViewPort = Math.trunc(state.viewPortSize.width / this.getLabelWidth ()); // todo some coef for padding
             const w = bounds[1] - bounds[0];
@@ -992,7 +1030,7 @@
                     elHolder.el.attr('opacity', visible ? 1 : 0);
                     elHolder.el.attr('transform', a2m([1,0,0,1,pmulX(elHolder.x, hm),0]));
                 }
-            }
+            } });
 
             this.currentHM = hm;
         }
@@ -1301,7 +1339,7 @@
                 const leftPos = limit(startState.leftPos + dndEvent.delta.x, 0, w - sliderWidth);
                 const rightPos = leftPos + sliderWidth;
                 this.state = {...this.state, leftPos, rightPos};
-                this.updateElementsByState();
+                requestAnimationFrame(() =>this.updateElementsByState());
                 this.raiseRangeChange();
             });
         }
