@@ -1012,7 +1012,7 @@
             }
 
             // todo check same xscale!
-   	    requestAnimationFrame(() => { 	    
+            requestAnimationFrame(() => {
    
             // eval visible labels
             const maxLabelInViewPort = Math.trunc(state.viewPortSize.width / this.getLabelWidth ()); // todo some coef for padding
