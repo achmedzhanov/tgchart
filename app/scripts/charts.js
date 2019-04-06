@@ -163,7 +163,13 @@
         }
 
         on(name, h) {
-            this._el.addEventListener(name, h, false);
+            if(typeof name == 'string') {
+                this._el.addEventListener(name, h, false);
+            } else {
+                for(let i=0;i<name.length;i++) {
+                    this._el.addEventListener(name[i], h, false);
+                }
+            }
             return this;
         }
 
@@ -1226,12 +1232,19 @@
 
     }
 
-    function dnd(e, ondnd, data) {
+    function dnd(targetElement, e, ondnd, data) {
         const startEvent = e;
+        let latestEvent = e;
         const fireDndEvent = (mme, last) => {
+            
+            if(last) {mme = latestEvent}
+
+            let pointNew = mme.touches ? mme.touches[0] : mme;
+            const pointStart = startEvent.touches ? startEvent.touches[0] : startEvent
+            
             const delta = {
-                x: mme.clientX - startEvent.clientX,
-                y: mme.clientY - startEvent.clientY
+                x: pointNew.clientX - pointStart.clientX,
+                y: pointNew.clientY - pointStart.clientY
             };
             const dndEvent = {
                 mme: mme,
@@ -1239,6 +1252,7 @@
                 data: data,
                 finished: last
             };
+            latestEvent = mme;
             ondnd(dndEvent);
         }
         const onMouseMove = (mme) => {
@@ -1250,22 +1264,27 @@
             fireDndEvent(mme, true);
             finish();
         };
-        const preventTouchScroll = (mme) => {
-            if(finished) return;
-            if(mme.cancelable) mme.preventDefault();
-        };        
         let finished = false;
+        const isTouch = (!!startEvent.touches) && startEvent.touches.length > 0;
+        
         const finish = () => {
             finished = true;
-            document.removeEventListener('pointermove', onMouseMove);
-            document.removeEventListener('pointerup', onMouseUp);
-            document.removeEventListener('touchmove', preventTouchScroll);
-            // document.removeEventListener('touchstart', preventTouchScroll);
+            if(isTouch) {
+                targetElement.el.removeEventListener('touchmove', onMouseMove);
+                document.removeEventListener('touchend', onMouseUp);
+            } else {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+            }
         };
-        document.addEventListener('pointermove', onMouseMove);
-        document.addEventListener('pointerup', onMouseUp);
-        document.addEventListener('touchmove', preventTouchScroll, { passive:false });
-        // document.addEventListener('touchstart', preventTouchScroll, { passive:false });
+        
+        if(isTouch) {
+            targetElement.el.addEventListener('touchmove', onMouseMove);
+            document.addEventListener('touchend', onMouseUp);
+        } else {
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
+        }
     }
 
     function limit(v, min, max) {
@@ -1289,9 +1308,9 @@
             this.leftGripperEl = createEl('div').addClass('left-gripper').appendTo(this.el);
             this.rightGripperEl = createEl('div').addClass('right-gripper').appendTo(this.el);
             this.sliderEl = createEl('div').addClass('slider').appendTo(this.el);
-            this.sliderEl.on('pointerdown', (e) => this.onSliderMouseDown(e));
-            this.leftGripperEl.on('pointerdown', (e) => this.onLeftGripperMouseDown(e));
-            this.rightGripperEl.on('pointerdown', (e) => this.onRightGripperMouseDown(e));
+            this.sliderEl.on(['mousedown', 'touchstart'], (e) => this.onSliderMouseDown(e));
+            this.leftGripperEl.on(['mousedown', 'touchstart'], (e) => this.onLeftGripperMouseDown(e));
+            this.rightGripperEl.on(['mousedown', 'touchstart'], (e) => this.onRightGripperMouseDown(e));
             this.positionByRange();
         }
         raiseRangeChange() {
@@ -1335,7 +1354,7 @@
             const startState = this.cloneState();
             const minWidth = this.minRangeWidth / 100 * w;
             const sliderWidth = Math.max(startState.rightPos - startState.leftPos, minWidth);
-            dnd(e, (dndEvent) => {
+            dnd(this.sliderEl, e, (dndEvent) => {
                 const leftPos = limit(startState.leftPos + dndEvent.delta.x, 0, w - sliderWidth);
                 const rightPos = leftPos + sliderWidth;
                 this.state = {...this.state, leftPos, rightPos};
@@ -1349,7 +1368,7 @@
             const w = this.getWidth();
             const startState = this.cloneState();
             const minWidth = this.minRangeWidth / 100 * w;
-            dnd(e, (dndEvent) => {
+            dnd(this.leftGripperEl, e, (dndEvent) => {
                 const leftPos = limit(startState.leftPos + dndEvent.delta.x, 0, startState.rightPos - minWidth);
                 this.state = {...this.state, leftPos};
                 this.updateElementsByState();
@@ -1362,7 +1381,7 @@
             const w = this.getWidth();
             const startState = this.cloneState();
             const minWidth = this.minRangeWidth / 100 * w;
-            dnd(e, (dndEvent) => {
+            dnd(this.rightGripperEl, e, (dndEvent) => {
                 const rightPos = limit(startState.rightPos + dndEvent.delta.x, startState.leftPos + minWidth, w);
                 this.state = {...this.state, rightPos};
                 this.updateElementsByState();
