@@ -108,7 +108,7 @@
             cancelAnimationFrame(animationsMap[key].rId);
             
             const pas = animationsMap[key];
-            let p = (new Date() - pas.startTime) / pas.duration;
+            let p = (Date.now() - pas.startTime) / pas.duration;
             if(p >= 1) p = 1;
             //console.log('\tanimate/if' + '\t\t\t#' + aId , p);
             const continuedV = pas.range.from + (pas.range.to - pas.range.from) * pas.ease(p);
@@ -131,9 +131,9 @@
         }
 
         // TODO use performnce.now instead of new Date ???
-        let startTime = new Date();
+        let startTime = Date.now();
         const a = () => {
-            let p = (new Date() - startTime) / duration;
+            let p = (Date.now() - startTime) / duration;
             if(p >= 1) p = 1;
             //console.log('\tanimate/if' + '\t\t\t#' + aId , p);
             const v = range.from + (range.to - range.from) * ease(p);
@@ -423,16 +423,14 @@
                 sizeSVG(svgEl, s.svgSize, viewPortPaddings);
             })
 
-            // Y axis
             const yAxisG =  createSVG('g')
-            .addClass('animate-transform')
+            //.addClass('animate-transform')
             .style('vector-effect', 'non-scaling-stroke')
             .appendTo(svgEl);
             state.elements.hGridLinesG = yAxisG;
          
             //X axis
             const xAxisG =  createSVG('g')
-            .addClass('animate-transform')
             .appendTo(svgEl);
             sizes$((s) => xAxisG.attr('transform', 'translate(0, ' + (s.viewPortSize.height + xAxisHeight * 0.8 ) + ')'));
 
@@ -674,20 +672,12 @@
             return [xMin, xMax, 0 /*yMin*/, round1000Range(yMax)];
         }
 
-        requestUpdate(u) {
-            // if(this.lastUpdate) { 
-            //     console.log('requestUpdate/cancelAnimationFrame'); 
-            //     cancelAnimationFrame(this.lastUpdate); 
-            //     this.lastUpdate = null;
-            // }
 
-            // TODO spawn render from setTimeout(1000/6), not raf
-
-            // TODO RAF with overriding U, no cancel, no many requests!
-
+        rafCommit() {
+            if(this.lastUpdate) return;
             this.lastUpdate = requestAnimationFrame(() => {
                 //console.log('requestUpdate/update', performance.now()); 
-                u();
+                this.commitMarkup();
                 this.lastUpdate = null;
             });
         }
@@ -698,7 +688,7 @@
             if(force) {
                 this.commitMarkup();
             } else {
-                this.requestUpdate(this.commitMarkupB);
+                this.rafCommit(this.commitMarkupB);
             }
         }
 
@@ -782,16 +772,25 @@
             if(!commitedMarkupState || yScale != commitedMarkupState.yScale || !this.equalP(xScale, commitedMarkupState.xScale)) {
                 const vm  = this.vMatrixByScale(yScale);
                 const visibleLinesIds = this.getAllLinesIds();
+                let xValues = null;
                 for (let lId of visibleLinesIds) {
                     // todo check lines opacity!
                     const c = this.columnsMap[lId];
-                    let d = '';
-                    for(let pIdx = 1; pIdx < c.length; pIdx++) {
-                        d += (pIdx == 1 ? 'M' : 'L');
-                        d += ((pIdx - 1) * xStep) * xScale;
-                        d += ' ';
-                        d += pmulY(this.transformY(c[pIdx]), vm);
+                    if(!xValues) {
+                        xValues = new Array(c.length + 1);
+                        for(let pIdx = 1; pIdx < c.length; pIdx++) {
+                            xValues[pIdx] = (((pIdx - 1) * xStep) * xScale).toFixed(2);
+                        }
                     }
+                    let d = '';
+                    const a = [];
+                    for(let pIdx = 1; pIdx < c.length; pIdx++) {
+                        a.push((pIdx == 1 ? 'M' : 'L'));
+                        a.push(xValues[pIdx]);
+                        a.push(' ');
+                        a.push(pmulY(this.transformY(c[pIdx]), vm).toFixed(2));
+                    }
+                    d = a.join('');
                     this.linesElements[lId].attr('d', d);
                 }
                 //console.log('commit -->');
@@ -833,6 +832,7 @@
         init() {
             this.viewPortBackdropEl.on('click', (e )=> {this.onViewPortClick(e)});
             this.viewPortBackdropEl.on('mousemove', (e )=> {this.onViewPortClick(e)});
+            this.viewPortBackdropEl.on('touchmove', (e )=> {this.onViewPortClick(e)});
             this.checkPinterActivityToClose = (e) => {this.onSomePointerActivity(e);}
         }
 
@@ -904,7 +904,13 @@
             const vm = this.viewPort.currentTransformations.vm;
 
             const ihm = minverse(hm);
-            const translatedPoint = pmul([e.offsetX, e.offsetY], ihm);
+            let screenPoint;
+            if(e.touches && e.touches.length) {
+                screenPoint = [e.touches[0].pageX - e.touches[0].target.offsetLeft, e.touches[0].pageY - e.touches[0].target.offsetTop];
+            } else {
+                screenPoint = [e.offsetX, e.offsetY];
+            }
+            const translatedPoint = pmul(screenPoint, ihm);
             const tx = translatedPoint[0];
             const pIdx = Math.round(tx / xStep) + 1;
             const xPoint = (pIdx - 1) * xStep;
@@ -963,6 +969,7 @@
     class XAxis {
         constructor(options) {
             this.el = new ElementBuilder(options.containerEl);
+            this.textsG = createSVG('g').appendTo(this.el);
             this.xColumn = options.xColumn;
             this.elementsCache = {};
             this.currentRangeKey = null;
@@ -989,15 +996,17 @@
                 const tEl = createSVG('text')
                 .attr('x',  '0')
                 .attr('y',  '0')
-                .attr('transform', a2m([1,0,0,1,pmulX(x, hm),0]))
+                //.attr('transform', a2m([1,0,0,1,pmulX(x, hm),0]))
                 .textContent('' + labelText)
                 .addClass('chart-x-line-text')
                 .addClass('animate-opacity')
-                .appendTo(this.el);
+                .appendTo(this.textsG);
                 
                 const v = {el: tEl, x: x};
 
                 this.textElements[i] = v;
+
+                this.textsG.attr('transform', a2m([1,0,0,1,pmulX(0, hm),0]));
 
                 return v;
             }            
@@ -1020,25 +1029,36 @@
             // todo check same xscale!
             requestAnimationFrame(() => {
    
-            // eval visible labels
-            const maxLabelInViewPort = Math.trunc(state.viewPortSize.width / this.getLabelWidth ()); // todo some coef for padding
-            const w = bounds[1] - bounds[0];
-            const actualLabelInViewPort = w / xStep;
-            const k = actualLabelInViewPort / maxLabelInViewPort;
-            const visibleK = this.finPowerTwo(k);
+                //if(mequals(this.currentHM, hm)) return;
 
-            for(let i=0;i<this.textElements.length;i++) {
-                
-                const visible = ((i % visibleK) ==0) /*&& i !== 0 && i !== this.textElements.length - 1*/;
-                const isLabelInsideBouds = bounds[0] <= i * xStep && i * xStep <= bounds[1];
-                let elHolder = visible && isLabelInsideBouds ? this.getOrCreateTextEl(i) : this.textElements[i];
-                if(elHolder) {
-                    elHolder.el.attr('opacity', visible ? 1 : 0);
-                    elHolder.el.attr('transform', a2m([1,0,0,1,pmulX(elHolder.x, hm),0]));
-                }
-            } });
+                // eval visible labels
+                const maxLabelInViewPort = Math.trunc(state.viewPortSize.width / this.getLabelWidth ()); // todo some coef for padding
+                const w = bounds[1] - bounds[0];
+                const actualLabelInViewPort = w / xStep;
+                const k = actualLabelInViewPort / maxLabelInViewPort;
+                const visibleK = this.finPowerTwo(k);
+                //const needToChangeOpacity = true; // visibleK != this.currentVisibleK;
 
-            this.currentHM = hm;
+                const scaleM = [hm[0] ,0,0, 1, 0, 0];
+                const translateM = [1,0,0, 1, hm[4], 0];
+                for(let i=0;i<this.textElements.length;i++) {
+                    
+                    const visible = ((i % visibleK) ==0) /*&& i !== 0 && i !== this.textElements.length - 1*/;
+                    const isLabelInsideBouds = bounds[0] <= i * xStep && i * xStep <= bounds[1];
+                    let elHolder = visible && isLabelInsideBouds ? this.getOrCreateTextEl(i) : this.textElements[i];
+                    if(elHolder) {
+                        //if(needToChangeOpacity) {
+                            elHolder.el.attr('opacity', visible ? 1 : 0);
+                        //}
+                        elHolder.el.attr('transform', 'translate(' + pmulX(elHolder.x, scaleM) + ', 0)' );
+                    }
+                } 
+
+                this.textsG.attr('transform', a2m([1,0,0,1,pmulX(0, translateM),0]));
+                this.currentHM = hm;
+                this.currentVisibleK = visibleK;
+            });
+
         }
 
         getLabelWidth() {
